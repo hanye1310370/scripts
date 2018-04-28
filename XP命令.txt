@@ -1,0 +1,145 @@
+winver:检查Windows版本
+
+write:运行写字板实用程序
+
+wiaacmgr:打开扫描仪和照相机向导
+
+Mspaint  :运行画图实用程序
+
+mstsc:远程桌面连接
+
+magnify：运行放大镜实用程序
+
+dxdiag:检查DirectX信息
+
+devmgmt.msc:打开设备管理器
+
+dfrg.msc:运行磁盘碎片整理程序
+
+diskmgnt.msc:运行磁盘管理实用程序
+
+notepad:运行记事本实用程序
+
+ntbackup:打开系统备份和还原向导
+
+syncapp:如果桌面上没有“我的公文包”，则创建一个
+
+sndrec32:运行录音机实用程序
+
+shrpubw:创建共享文件夹
+
+secpol.msc:设置本地安全策略
+
+services.msc:本地服务设置
+
+sndvo132:运行音量控制程序
+
+tsshutdn:60秒倒计时关闭命令
+
+taskmgr:运行任务管理器
+
+eventvwr:打开事件查看器
+
+eudcedit:运行造字程序
+
+explorer:打开资源管理器
+
+perfmon:运行Windows XP性能监测程序
+
+regedit:打开注册表
+
+cmd:打开MS-DOS命令提示符
+
+chkdsk:进行磁盘检查
+
+calc:运行计算器实用程序
+
+charmap:打开字符映射表
+
+clipbrd:查看剪切板内容
+
+conf:运行netmeeting实用程序
+
+compmgmt.msc:对电脑进行管理
+
+cleanmg:清理驱动器垃圾
+
+osk:打开屏幕键盘
+
+oobe/msoobe/a:检查Windows XP是否已激活
+
+lusrmgr.msc:设置本机用户和组
+
+logoff:注销命令
+
+fsmgmt.msc:管理共享文件夹
+
+utilman:打开辅助工具管理器
+
+gpedit.msc:配置组策略
+
+winmsd:帮助和支持中心
+
+wmimgmt.msc:打开Windows管理体系结构WMI
+
+wupdmgr:Windows更新程序
+
+winchat:Windows XP自带局域网聊天
+
+mplayer2:简易Windows Media Player
+
+mmc:打开控制台
+
+mobsync:同步命令
+
+drwtsn32:系统医生
+
+dcomcnfg:打开系统组件服务
+
+Ddeshare:打开DDE共享设置
+
+dvdplay:DVD播放器
+
+net stop messenger:停止信使服务
+
+net start messenger:开始信使服务
+
+nslookup:网络管理的工具向导
+
+narrator:屏幕讲述人
+
+ntmsmgr.msc:移动存储管理器
+
+ntmsoprq.msc:移动存储管理员操作请求
+
+netstat-an:（TC）命令检查接口
+
+sysedit:系统配置编辑器
+
+sigverif:文件签名验证程序
+
+sfc.exe:系统文件检查器
+
+sfc/scannow:Windows 文件保护
+
+
+
+
+#vi ~/.bashrc  #vi ~/.vimrc(:se nu)
+#LANG=zh_CN.utf8
+#LANG=en_us.utf8
+#ipcalc -bmn 192.168.10.1/26  计算出192.168.10.1/26的子网掩码、网络号、广播地址。各子网范围。
+#route add -net 202.1.1.0 netmask 255.255.255.0 gw 172.16.100.254 dev eth0
+#route add -host 192.168.10.2 gw 172.168.100.167 dev eth0
+#ll /dev/cdrom 
+/dev/cdrom ->hda
+#mount /dev/cdrom  /mnt 
+# ll /dev/hd*
+brw-rw---- 1 root disk  3, 0 Sep  3 10:12 /dev/hda
+brw-rw---- 1 root disk 22, 0 Sep  3 10:12 /dev/hdc(查挂载点）
+ #sync;sync （同步硬盘）
+
+#yum grouplist (查看已安装组包，显示出内容后，按shift+PageUp/PageDn 可上下查看。也是用于字符界面查看历史输出，或前页内容）
+# watch --interval=2 du -sh /data（动态统计目录大小变化）
+#cat >>file <<end (向文件追加内容，输入END结束）
+# cat /etc/sysconfig/network-scripts/route-eth0(查路由）
