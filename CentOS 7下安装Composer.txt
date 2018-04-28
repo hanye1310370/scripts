@@ -1,0 +1,40 @@
+CentOS 7下安装Composer
+1
+安装Composer
+1、将composer.phar下载到项目中
+使用curl -sS https://getcomposer.org/installer | php下载Composer 的二进制文件，是一个 PHAR 包（PHP 的归档）
+2、可以通过 --install-dir 选项指定 Composer 的安装目录（它可以是一个绝对或相对路径）：curl -sS https://getcomposer.org/installer | php -- --install-dir=lumen
+3、如果把composer.phar放在系统的 PATH 目录中，就能在全局访问composer.phar。 在类Unix系统中，你甚至可以在使用时不加 php 前缀。可以执行这些命令让 composer 在你的系统中进行全局调用：
+#mv composer.phar /usr/local/bin/composer
+现在只需要运行 composer 命令就可以使用 Composer 而不需要输入 php composer.phar。
+4、检查 Composer 是否正常工作，只需要通过 php 来执行 PHAR：php composer.phar这将返回给你一个可执行的命令列表。
+
+
+
+使用 Composer
+要在项目中使用 Composer，只需要一个 composer.json 文件。该文件包含了项目的依赖和其它的一些元数据。现在使用 Composer 来安装项目的依赖。
+1、创建 composer.json 文件
+在当前目录下创建 composer.json 文件，在 composer.json 文件中指定 require key 的值。简单的告诉 Composer 你的项目需要依赖哪些包。
+例如：
+{    "require": {        "monolog/monolog": "1.0.*"    } }
+可以看到， require 需要一个 包名称  monolog/monolog映射到 包版本 1.0.*的对象。包名称由供应商名称和其项目名称构成。
+2、安装依赖包
+执行 install 命令获取定义的依赖到本地项目：
+php composer.phar install
+如果你进行了全局安装，并且没有 phar 文件在当前目录，使用下面的命令代替：
+composer install
+这将会找到 monolog/monolog 的最新版本，并将它下载到 vendor 目录。 这是一个惯例把第三方的代码到一个指定的目录 vendor。如果是 monolog 将会创建 vendor/monolog/monolog 目录。
+注意： install 命令将创建一个 composer.lock 文件到你项目的根目录中。
+3、自动加载
+除了库的下载，Composer 还准备了一个自动加载文件，它可以加载 Composer 下载的库中所有的类文件。使用它，你只需要将下面这行代码添加到你项目的引导文件中：
+require 'vendor/autoload.php';
+现在我们就可以使用 monolog 了
+
+Composer的使用
+列举一些常用的。
+
+composer self-update：更新composer版本。(当然，你也可以采取下载composer.phar文件进行覆盖更新)。
+composer install：根据当前目录下的composer.json文件来安装依赖代码库。
+composer update：更新依赖代码库。
+composer create-project：创建项目。
+composer init：交互方式在当前目录下创建composer.json文件

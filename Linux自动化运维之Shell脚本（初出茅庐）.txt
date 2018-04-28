@@ -1,0 +1,588 @@
+当前可用的shell 解释器
+
+[root@localhost ~]# cat /etc/shells 
+/bin/sh
+/bin/bash           #默认用
+/sbin/nologin
+/usr/bin/sh
+/usr/bin/bash
+/usr/sbin/nologin       #不能用
+/bin/tcsh
+/bin/csh
+写脚本步骤
+1.新建文件
+扩展名.sh
+2.写代码（解释器，注释）
+开头
+#!/bin/bash [解释器是谁]
+注释内容 时间，版本，功能，联系人（邮件）
+3.给权限，执行 （x执行权限）
+PATH （命令搜索的目录）
+ln -s test.sh /usr/bin
+所有执行方式（开子进程）
+./test.sh
+/root/test.sh
+bash test.sh #不需要赋予权限
+source test.sh (不开子进程) #修改配置文件 让其在当前下立即生效
+
+bash使用技巧
+命令序列使用技巧
+命令 & #后台运行命令，不影响当前Shell使用
+命令；命令；命令 #所有命令顺序执行
+命令1 && 命令2 #命令1执行成功执行命令2
+命令1 || 命令2 #命令1执行失败执行命令2
+命令1 && 命令2 || 命令3 #命令1 执行成功执行命令2 执行失败执行命令3
+[root@A ~]# [ 'a' == 'a' ] && echo Y || echo N
+Y
+[root@A ~]# [ 'a' == 'b' ] && echo Y || echo N
+N
+
+重定向使用技巧
+重定向命令的输出
+覆盖重定向 >
+追加重定向 >>
+把前面命令的输出结果，写入到文本文件中
+标准输入 0
+标准输出 1
+错误输出 2
+不论对错 默认输出（屏幕）
+
+正确重定向
+2> 错误重定向
+花括号{} 可生成所需字串
+
+[root@test ~]# echo {a,b,c}
+a b c
+[root@test ~]# echo {1..10}
+1 2 3 4 5 6 7 8 9 10
+[root@test ~]# echo {a..e}
+a b c d e
+[root@test ~]# echo {3..-1}
+3 2 1 0 -1
+引号：
+双引号 "" 可以界定一个完整字符串
+单引号 ' ' 可以界定一个完整字符串，并且可以实现屏蔽特殊符号(原封不动输出)
+反引号 `` 同$() 仅可以放命令，提取的是命令的结果
+
+cron 周期性计划任务
+
+软件包：cronie,crontabs
+系统服务:crond
+日志文件： /var/log/crond
+默认安装，默认自启
+systemctl status crond  #查看服务状态     
+crontab命令
+选项： -u  指定计划任务的用户 默认为当前用户
+-e  编辑任务 
+-r  删除任务
+-i  使用-r 删除计划任务时，要求用户确认删除  
+-l  查看任务  
+时间顺序
+*       *       *       *       *   
+分(0-59) 时(0-23) 日(1-31) 月(1-12) 周 (0-7)
+*  表示所有时间
+-  表示一段持续的时间
+， 表示若个不连续的时间
+/  表示时间间隔       
+查询命令所对应的程序在那里
+which 命令
+变量的定义/赋值/查看
+export 变量 #发布全局变量
+
+自定义变量
+变量名=值
+变量名：字母，数字，_(不能数字开始)
+
+环境变量
+
+[root@test ~]# echo $PATH
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin
+[root@test ~]# echo $HOME   用户家目录
+/root
+[root@test ~]# echo $USER   当前用户名
+root    
+[root@test ~]# echo $UID        当前用户ID
+0
+[root@test ~]# echo $HOSTNAME   主机名
+test
+[root@test ~]# echo $PS1        #一级提示符
+[\u@\h \W]\$
+[root@test ~]# echo $PS2        #二级提示符
+>
+位置变量
+$0 #代表当前Shell程序的文件名称
+$n n={1..n} #代表运行Shell程序时第n个参数
+$# #代表Shell程序所有参数个数
+$* #所有参数内容
+$$ #脚本PID
+$? #判断程序执行状态 0代表执行成功 非0代表执行失败
+例：
+
+    [root@test ~]#vim /root/test.sh 
+    #!/bin/bash
+    echo $0
+    echo $1
+    echo $2
+    echo $* 
+    echo $# 
+    echo $$     
+    [root@test ~]#bash /root/test.sh aa bb cc 88 oo
+    /root/test.sh
+    aa
+    bb
+    aa bb cc 88 oo
+    5
+    23607
+算术运算
+expr 不符合人类使用 反人类
+
+[root@A ~]# expr 1 + 1
+2
+[root@A ~]# expr 1 - 1
+0
+[root@A ~]# expr 1 \* 1
+1
+[root@A ~]# expr 1 / 1
+1
+[root@A ~]# expr 10 % 3
+1
+$[ ] 或 $(( ))
+
+[root@A ~]# echo $[1+1]
+2
+[root@A ~]# echo $((1+1))
+2
+[root@A ~]# x=2
+[root@A ~]# y=3
+[root@A ~]# echo $[x+y]
+5
+[root@A ~]# echo $((x+y))
+5
+let 可以直接对变量值做运算再保存新的值
+
+[root@A ~]# let z=x+y
+[root@A ~]# echo $z
+5
+[root@A ~]# i=1
+[root@A ~]# let i++
+[root@A ~]# echo $i
+2
+[root@A ~]# let i+=3
+[root@A ~]# echo $i
+5
+[root@A ~]# let i--
+[root@A ~]# echo $i
+4
+[root@A ~]# let i*=2
+[root@A ~]# echo $i
+8
+判断
+[ 判断条件 ]
+1.字符判断
+
+字符串测试
+[root@A ~]# [ 'a' == 'a' ]
+[root@A ~]# echo $?
+0
+[root@A ~]# [ 'a' == 'b' ]
+[root@A ~]# echo $?
+1
+[root@A ~]# [ 'a' != 'b' ]
+[root@A ~]# echo $?
+0
+[root@A ~]# [ -z $abc ] #判断abc变量是否为空（zero）
+[root@A ~]# echo $?
+0
+[root@A ~]# abc='a'
+[root@A ~]# [ -z $abc ]
+[root@A ~]# echo $?
+1
+[root@A ~]# [ ! -z $abc ]   #判断是否非空 ! 和 -z 之间有空格
+[root@A ~]# echo $?
+0
+2.数字判断
+
+-eq 等于      equal
+-ne 不等于     not equal
+-gt 大于      greater than
+-ge 大于等于    greater equal
+-lt 小于      less than   
+-le 小于等于    less equal
+3.文件判断
+
+-e  判断是否存在  exist
+-f  判断是否存在，且为文件file
+-d  判断是否存在，且为目录dir
+-r  判度是否可读
+-w  判断是否可写
+-x  判断是否可执行
+
+&& 逻辑与
+||  逻辑或
+if选择结构
+
+    单分支
+if 条件测试 ；then
+    命令序列xx
+else 
+    命令序列yy
+fi
+    多分支
+if 条件测试1 ; then
+    命令序列xx
+elif 条件测试2 ; then
+    命令序列yy
+else
+    命令序列zz
+fi
+for 循环
+
+for 变量名 in 值列表
+do
+    命令序列
+done
+while 循环
+
+while 条件测试
+do
+    命令序列
+done
+case 判断 精简的if
+
+case $1 in 
+redhat)
+    echo "XXX"
+    echo "fedora";;
+fedora)
+    echo "redhat";;
+*)
+    echo "Usage";;
+esac
+中断 循环
+
+break   中断整个循环体
+continue    中断本次循环，进入下一次循环
+exit        中断整个脚本
+字符串截取的三种方法
+${var:起始位置：长度}
+expr substr "$var" 起始位置 长度
+echo $var | cut -b 起始位置-结束位置
+
+    [root@A shell]# x=123asdawqe123
+    [root@A shell]# echo ${x:1:4}   注意：0开始计数
+    23as
+    [root@A shell]# expr substr "$x" 1 5
+    123as
+    [root@A shell]# echo $x | cut -b 1-5
+    123as
+    [root@A shell]# echo $x | cut -b 1,2,4,5
+    12as
+    [root@A shell]# a=1
+    [root@A shell]# b=5
+    [root@A shell]# echo $x | cut -b $a-$b
+    123as
+    [root@A shell]# expr substr "$x" $a $b
+    123as
+    [root@A shell]# echo ${x:$a:$b}
+    23asd
+字符替换
+
+    [root@A shell]# echo ${x/3/*}       将第一个3替换成*
+    12*asdawqe123
+    [root@A shell]# echo ${x//3/*}      将所有3替换成*
+    12*asdawqe12*
+    [root@A shell]# echo $x
+    123asdawqe123
+    [root@A shell]# echo ${x//123/*}
+    *asdawqe*
+字符串的掐头去尾
+
+    [root@A shell]# x=`head -1 /etc/passwd`
+    [root@A shell]# echo $x
+    root:x:0:0:root:/root:/bin/bash
+从左向右
+    [root@A shell]# echo ${x#*:}    #最短删除
+    x:0:0:root:/root:/bin/bash
+    [root@A shell]# echo ${x##*:}   #最多删除
+    /bin/bash
+从右向左
+    [root@A shell]# echo ${x%:*}    #最短删除
+    root:x:0:0:root:/root
+    [root@A shell]# echo ${x%%:*}   #最长删除
+    root
+字符串赋初值
+
+    [root@A shell]# echo ${XX:-123}
+    123
+    [root@A shell]# echo $XX
+
+    [root@A shell]# echo ${XX:=123}
+    123
+    [root@A shell]# echo $XX
+    123
+数组（一个变量，存多个值）
+
+[root@A shell]# a=(11 22 33 44)     #定义数组
+[root@A shell]# echo ${a[0]}
+11
+[root@A shell]# echo ${a[1]}
+22
+[root@A shell]# echo ${a[*]}            #  *表示所有
+11 22 33 44
+expect软件
+自动输入密码
+
+#!/bin/bash
+for i in `cat /root/ping.txt`
+do
+rm -rf /root/.ssh/known_hosts
+            echo $i
+            expect <<EOF
+            set timeout 30
+            spawn ssh $i
+            expect yes { send "yes\n" }
+            expect password  { send "Taren1\n" }
+            expect # { send "cat /etc/hostname\n" }
+            expect # { send "exit\n" }
+EOF
+done
+1.有时有yes提示，有时没有
+    删除known_hosts 
+2.ssh比较慢
+    把你ssh变快（修改配置文件）
+函数
+函数名（）{
+命令序列
+}
+
+[root@A ~]# mymkdir(){
+> mkdir /test
+> }
+[root@A ~]# mymkdir
+
+[root@A ~]# echo -e "\033[32mOK\033[0m"
+OK      #输出的OK 为绿色
+[root@A ~]# echo -e "\033[32m"
+        #整个终端变成绿色
+[root@A shell]# echo -e "\033[42m"
+        #整个终端背景变成绿色
+    3X 是字体颜色
+    4X 是背景颜色
+    X 是样式
+练习：
+1)判断是否有/opt/mnt目录，有挂载光盘，没有目录，创建目录，然后挂载光盘
+
+#!/bin/bash
+[  -d /opt/mnt ] || mkdir /opt/mnt
+mount /dev/cdrom /opt/mnt
+2)每分钟检测当前计算机登录用户数量,如果数量大于2，则发送邮件报警
+
+*/2 * * * *   /usr/bin/bash /root/test.sh
+
+#!/bin/bash
+i=`who | wc -l`
+if [ $i -gt 2 ];then
+    echo '当前登录用户超过2个' |  mail -s '警告' root
+fi
+#!/bin/bash
+i=`who | wc -l`
+[ $i -gt 2 ] && echo '当前登录用户超过2个' |  mail -s '警告' root
+3)测试ping通性 （时间优化）
+
+#!/bin/bash
+read -p '输入测试IP: ' IP
+ping -c 2 -i 0.1 -W 1 $IP &> /dev/null      #-i 0.1 ping间隔时间为0.1s  
+if [ $? -eq 0 ];then                    #-W 1 ping 等待时间 1s
+    echo '可于连通'
+else 
+    echo '不可以连通'
+fi
+4)判断80端口是否启动
+
+#!/bin/bash
+netstat -pantu | grep ':80' &> /dev/null
+if [ $? -eq 0 ];then
+    echo '80端口开启'
+else
+    echo '80端口关闭'
+fi
+5)判断计算机是否安装了xx软件
+
+#!/bin/bash
+read -p '输入你有检查的软件名: ' A
+rpm -qa | grep $A &> /dev/null
+if [ $? -eq 0 ];then
+    echo '计算机已经安装'
+else
+    echo '未安装'
+fi
+6)猜数游戏
+
+#!/bin/bash
+read -p '请输入你要猜的范围：' num
+read -p '请输入你要猜的次数：' n
+NUM=$[RANDOM%$num+1]
+while [ $n -gt 0 ]
+do
+    read -p '请输入你要猜的数： ' nu
+    if [ -z $nu ];then
+        echo '请正确输入'
+    elif [ $nu -gt $NUM ];then
+        echo '请正确输入'
+    else
+        if [ $NUM -eq $nu ];then
+            echo '猜对了'
+            exit
+        elif [ $NUM -lt $nu  ];then
+            echo '猜大了'
+        else 
+            echo '猜小了'
+        fi
+        let n--
+        if [ $n -eq 0 ];then
+            echo '游戏结束'
+            echo 其实是$NUM
+        else
+            echo "你还有${n}次机会"
+        fi
+    fi
+done
+7)测试当前网段存活IP
+
+#!/bin/bash
+rm -rf /root/ping.txt
+a=1
+while [ $a -le 255 ]
+do
+     ping -c 1 -i 0.1 -W 1 172.40.51.$a  &> /dev/null
+     if [ $? -eq 0 ];then
+            echo 172.40.51.${a} >> /root/ping.txt
+     fi
+     a=$(expr $a + 1 )
+done
+8)计算 1 到某个数的和
+
+#!/bin/bash
+read -p '请输入你要测试的数： ' num
+n=0
+for i in `seq $num`
+do
+    let n+=i
+done
+echo $n
+let num=(num+1)*num/2
+echo $num
+9)将/var/log/每个文件，单独打包，保存到/tmp
+
+#!/bin/bash
+for i in `ls /var/log`
+do
+    zip /tmp/$i.zip /var/log/$i &> /dev/null
+done
+10)判断用户输入的字母
+
+#!/bin/bash
+case $1 in
+a) echo 1;;
+b) echo 2;;
+c) echo 3;;
+d) echo 4;;
+e) echo 5;;
+f) echo 6;;
+g) echo 7;;
+*) echo *;
+esac
+11)创建新功能
+
+#!/bin/bash
+case "$1" in
+-n|--new) 
+    touch $2;;
+-e|--edit)
+    vim $2;;
+-c|--cat)
+    cat $2;;
+-r|--remove)
+    rm -rf $2;;
+*)
+    echo "Usage:$0 (-n|-e|-c|-r) 文件名"
+esac
+12)画出国际象棋棋盘
+
+#!/bin/bash
+n=1
+num=0
+for i in {1..8}
+do
+
+    for i in {1..4}
+    do
+        let num=$n%2
+        if [ $num -eq 0 ];then
+            echo -n -e "\033[47m   \033[0m"
+            echo -n -e "\033[40m   \033[0m"
+        else
+            echo -n -e "\033[40m   \033[0m"
+            echo -n -e "\033[47m   \033[0m"
+        fi
+
+    done
+    echo 
+    let n++
+done
+echo -e "\033[0m"
+13)99乘法表
+
+#!/bin/bash
+
+for i in {1..9}
+do
+                for j in `seq $i`
+                do
+                                echo -n "$j*$i=$[j*i]  "
+                done
+                echo 
+done
+14)批量自动生成用户
+
+#/bin/bash 
+for i in {1..15}
+do
+    useradd user$i 2>> /root/error.log 
+    echo 123 | passwd --stdin user$i  2>> /root/error.log >/dev/null
+done
+15)交互生成用户和密码
+
+#!/bin/bash
+read -p "input your user name : " user
+if [ -z "$user" ];then
+    echo "your user name is NULL "
+    exit
+fi
+read -p "input your password: " pass
+pass=${pass:-123456}
+useradd $user
+echo "$pass" | passwd --stdin $user
+16)累计相加
+
+#!/bin/bash
+read -p "please input your number : " n
+num=0
+n=${n:-100}
+while [ $n -gt 0 ]
+do
+    let num+=n
+    let n--
+done
+echo $num
+17)显示进度条
+
+#!/bin/bash
+jindu(){
+while :
+do
+                echo -ne "\033[42m \033[0m"
+                sleep 0.4
+done
+}
+jindu

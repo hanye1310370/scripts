@@ -1,0 +1,206 @@
+准备工作
+我的centos7系统是最小化安装的, 缺很多库, 首先安装必须的运行库
+?
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+yum install wget gcc gcc-c++ pcre-devel zlib-devel
+##创建工作目录并进入工作目录
+mkdir -p /z/nginx && cd /z/nginx
+##获取nginx最新的安装包
+wget http://nginx.org/download/nginx-1.11.10.tar.gz
+##解压缩
+tar zxvf nginx-1.11.10.tar.gz
+##进入目录
+cd nginx-1.11.10
+##检测系统配置, 生成make相关文件
+./configure
+./configure执行成功会输出以下信息
+nginx的安装位置,以及文件路径
+?
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+Configuration summary
+ + using system PCRE library
+ + OpenSSL library is not used
+ + using system zlib library
+ nginx path prefix: "/usr/local/nginx"
+ nginx binary file: "/usr/local/nginx/sbin/nginx"
+ nginx modules path: "/usr/local/nginx/modules"
+ nginx configuration prefix: "/usr/local/nginx/conf"
+ nginx configuration file: "/usr/local/nginx/conf/nginx.conf"
+ nginx pid file: "/usr/local/nginx/logs/nginx.pid"
+ nginx error log file: "/usr/local/nginx/logs/error.log"
+ nginx http access log file: "/usr/local/nginx/logs/access.log"
+ nginx http client request body temporary files: "client_body_temp"
+ nginx http proxy temporary files: "proxy_temp"
+ nginx http fastcgi temporary files: "fastcgi_temp"
+ nginx http uwsgi temporary files: "uwsgi_temp"
+ nginx http scgi temporary files: "scgi_temp"
+编译并安装
+?
+1
+make && make install
+创建nginx启动命令脚本
+?
+1
+vi /etc/init.d/nginx
+插入以下内容, 注意修改PATH和NAME字段, 匹配自己的安装路径 (这段是从网上copy的)
+?
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+#! /bin/bash
+# chkconfig: - 85 15
+PATH=/usr/local/nginx
+DESC="nginx daemon"
+NAME=nginx
+DAEMON=$PATH/sbin/$NAME
+CONFIGFILE=$PATH/conf/$NAME.conf
+PIDFILE=$PATH/logs/$NAME.pid
+SCRIPTNAME=/etc/init.d/$NAME
+set -e
+[ -x "$DAEMON" ] || exit 0
+do_start() {
+$DAEMON -c $CONFIGFILE || echo -n "nginx already running"
+}
+do_stop() {
+$DAEMON -s stop || echo -n "nginx not running"
+}
+do_reload() {
+$DAEMON -s reload || echo -n "nginx can't reload"
+}
+case "$1" in
+start)
+echo -n "Starting $DESC: $NAME"
+do_start
+echo "."
+;;
+stop)
+echo -n "Stopping $DESC: $NAME"
+do_stop
+echo "."
+;;
+reload|graceful)
+echo -n "Reloading $DESC configuration..."
+do_reload
+echo "."
+;;
+restart)
+echo -n "Restarting $DESC: $NAME"
+do_stop
+do_start
+echo "."
+;;
+*)
+echo "Usage: $SCRIPTNAME {start|stop|reload|restart}" >&2
+exit 3
+;;
+esac
+exit 0
+设置执行权限
+?
+1
+chmod a+x /etc/init.d/nginx
+注册成服务
+?
+1
+chkconfig --add nginx
+设置开机启动
+?
+1
+chkconfig nginx on
+重启, 查看nginx服务是否自动启动
+?
+1
+2
+shutdown -h 0 -r
+netstat -apn|grep nginx
+对nginx服务执行停止/启动/重新读取配置文件操作
+?
+1
+2
+3
+4
+5
+6
+7
+8
+#启动nginx服务
+systemctl start nginx.service
+#停止nginx服务
+systemctl stop nginx.service
+#重启nginx服务
+systemctl restart nginx.service
+#重新读取nginx配置(这个最常用, 不用停止nginx服务就能使修改的配置生效)
+systemctl reload nginx.service
+以上所述是小编给大家介绍的centos7系统下nginx安装并配置开机自启动操作，希望对大家有所帮助，如果大家有任何疑问请给我留言，小编会及时回复大家的。在此也非常感谢大家对脚本之家网站的支持！
+原文链接：http://blog.csdn.net/zhouyalei123/article/details/56282826

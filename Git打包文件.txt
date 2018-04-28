@@ -1,0 +1,61 @@
+Git打包文件
+
+ 
+目录
+1 打包所有文件
+2 打包更改的文件
+2.1 打包最后修改的文件
+2.2 打包最后两个版本修改的文件
+2.3 打包两个分支之间差别的文件
+Git中打包文件是个简单的活，不管是打包全部文件作为release，
+
+还是只压缩更改的文件，一个命令就能搞定。
+
+而且，打包之后目录结构完全不变，这对于覆盖部署来说极其方便。
+
+1 打包所有文件
+打包master分支的所有文件：
+
+$ git archive --format=zip --output master.zip master
+其中，输出格式为zip，输出文件为master.zip。git支持zip和tar两种输出格式。
+
+打包当前分支当前HEAD的所有文件：
+
+$ git archive --format=zip --output head.zip HEAD
+打包v1.2标签的所有文件：
+
+$ git archive --format=zip --output v1.2.zip v1.2
+2 打包更改的文件
+打包更改文件的原理是：
+
+用git diff 找出文件列表；
+用打包命令打包。
+也就是说，只要能用找出文件列表，就可以git打包出来。
+
+2.1 打包最后修改的文件
+先通过git diff找到最新版本修改过的文件，再压缩打包这些文件：
+
+$ git archive --format=zip -o update.zip HEAD $(git diff --name-only HEAD^)
+2.2 打包最后两个版本修改的文件
+总共也是2个版本：
+
+$ git archive --format=zip -o update.zip HEAD $(git diff --name-only HEAD~2)
+2.3 打包两个分支之间差别的文件
+$ git archive --format=zip -o update.zip HEAD $(git diff --name-only master fix-error)
+如上，打包master和fix-error分支差异的文件。
+
+
+
+root@iZ2ze3xrghth6n3ty61c33Z:~# cat /etc/supervisor/conf.d/zhengzhou_A1.conf 
+[program:zhengzhou_A1]
+process_name=%(program_name)s_%(process_num)02d
+command=/usr/local/php/bin/php /home/erp/zhengzhou/A1/artisan queue:work redis  --sleep=3 --tries=1
+autostart=true
+autorestart=true
+user=erp
+numprocs=256
+redirect_stderr=true
+stdout_logfile=/home/erp/logs/zhengzhou_A1_supervisor.log
+root@iZ2ze3xrghth6n3ty61c33Z:~# 
+
+ 

@@ -1,0 +1,56 @@
+统计Apache或Nginx访问日志里的独立IP访问数量的Shell
+
+转载自：http://www.liufofu.com/20120344.html
+
+1、把IP数量直接输出显示：
+
+cat access_log_2011_06_26.log |awk ‘{print $1}’|uniq -c|wc -l
+2、把IP数量输出到文本显示：
+
+cat access_log_2011_06_26.log |awk ‘{print $1}’|uniq -c|wc -l > ip.txt
+总结：如果单个访问日志大小超过2G，用这个命令查看时很占系统资源，系统负载会上升；所以在服务器高负载时不要查看，最好在低负载时间段查看。上面截图是公司其中一台广告服务器的一天ip访问量，这个访问量其实还包括了搜索引擎的。访问日志只能做个参考，要准确还是要程序来统计。
+
+4、查看Web服务器（Nginx Apache）的并发请求数及其TCP连接状态：
+
+netstat -n | awk ‘/^tcp/ {++S[$NF]} END {for(a in S) print a, S[a]}’
+或者：
+
+netstat -n | awk ‘/^tcp/ {++state[$NF]} END {for(key in state) print key,”t”,state[key]}’
+返回结果一般如下：
+
+LAST_ACK 5 （正在等待处理的请求数）
+SYN_RECV 30
+ESTABLISHED 1597 （正常数据传输状态）
+FIN_WAIT1 51
+FIN_WAIT2 504
+TIME_WAIT 1057 （处理完毕，等待超时结束的请求数）
+
+其他参数说明：
+
+CLOSED：无连接是活动的或正在进行
+LISTEN：服务器在等待进入呼叫
+SYN_RECV：一个连接请求已经到达，等待确认
+SYN_SENT：应用已经开始，打开一个连接
+ESTABLISHED：正常数据传输状态
+FIN_WAIT1：应用说它已经完成
+FIN_WAIT2：另一边已同意释放
+ITMED_WAIT：等待所有分组死掉
+CLOSING：两边同时尝试关闭
+TIME_WAIT：另一边已初始化一个释放
+LAST_ACK：等待所有分组死掉
+
+5、查看Nginx并发进程数
+
+ps -ef | grep nginx | wc -l
+返回的数字就是nginx的并非进程数，如果是apache则执行
+
+ps -ef | grep httpd | wc -l
+还可以用如下命令：
+
+watch -n 1 -d “pgrep nginx|wc -l”
+6、查看Web服务器进程连接数：
+
+netstat -antp | grep 80 | grep ESTABLISHED -c
+7、查看MySQL进程连接数：
+
+ps -axef | grep mysqld -c

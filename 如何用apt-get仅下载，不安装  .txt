@@ -1,0 +1,4 @@
+一、当系统已经安装了 某个二进制软件包， 但是， 在缓存目录/var/cache/apt/archives 中 软件安装包已经被清空，现在，想重新下载这个软件包，不安装:
+apt-get install -d --reinstall  PackageName；
+二、如果系统之前没有安装 此软件包， 现在只下载，不安装:
+apt-get install -d  PachageName

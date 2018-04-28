@@ -1,0 +1,95 @@
+#!/usr/bin/env python
+#-*-coding:utf-8-*-
+#Python nginx cut log 1
+import subprocess
+def mkdir():
+        subprocess.call('mkdir -pv /usr/local/nginx/logs/$(date -d "yesterday" +"%Y")/$(date -d "yesterday" +"%m")/',shell=True)
+def mv():
+        subprocess.call('mv /usr/local/nginx/logs/access.log /usr/local/nginx/logs/$(date -d "yesterday" +"%Y")/$(date -d "yesterday" +"%m")/access_$(date -d "yesterda
+y" +"%Y%m%d").log',shell=True)
+def kill():
+        pid = open("/usr/local/nginx/logs/nginx.pid","r")
+        f = pid.read()
+        f = f.strip()
+        pid.close()
+        kill = "kill"
+        kill_usage = "-USR1"
+        subprocess.call([kill,kill_usage,f])
+def main():
+        mkdir()
+        mv()
+        kill()
+if __name__ == "__main__":
+        main()
+         
+#!/usr/bin/env python
+#-*-coding:utf-8-*-
+#Python nginx cut log 2
+ 
+import time
+import os
+import datetime
+ 
+path = ['/usr/local/nginx/logs','access.log','nginx.pid']
+ 
+now_time = datetime.datetime.now()
+yes_time = now_time + datetime.timedelta(days=-1)
+yes_ymd = yes_time.strftime("%Y%m%d")
+yes_year = yes_time.strftime("%Y")
+yes_month = yes_time.strftime("%m")
+ 
+command1 = "mkdir -pv %s/%s/%s" % (path[0],yes_year,yes_month)
+command2 = "cd %s && mv %s %s/%s/%s/%s.log" % (path[0],path[1],path[0],yes_year,yes_month,yes_ymd)
+command3 = "kill -USR1 `cat %s/%s`" % (path[0],path[2])
+ 
+if os.system(command1) == 0:
+        print "目录生成成功！"
+else:
+        print "目录生成失败！"
+ 
+if os.system(command2) == 0:
+        print "日志切割成功！"
+else:
+        print "日志切割失败！"
+ 
+if os.system(command3) == 0:
+        print "平滑重启nginx成功！"
+else:
+        print "平滑重启nginx失败！"
+         
+#!/usr/bin/env python
+#-*-coding:utf-8-*-
+#Python nginx cut log 3
+ 
+import time
+import os
+import datetime
+import shutil
+ 
+#path列表存入路径和文件
+path = ['/usr/local/nginx/logs','access.log','nginx.pid']
+ 
+now_time = datetime.datetime.now()      #现在时间
+yes_time = now_time + datetime.timedelta(days=-1)       #昨天的时间
+yes_ymd = yes_time.strftime("%Y%m%d")   #格式化输出昨天的年月日
+yes_year = yes_time.strftime("%Y")      #格式化输出昨天的年份
+yes_month = yes_time.strftime("%m")     #格式化输出昨天的月份
+ 
+#创建备份目录
+path_back = "%s/%s/%s/" % (path[0],yes_year,yes_month)
+if os.path.exists(path_back) == False :
+        os.makedirs(path_back)
+ 
+#移动日志至备份目录下
+file_now = "%s/%s" % (path[0],path[1])
+file_back = "%s/%s/%s/%s.log" % (path[0],yes_year,yes_month,yes_ymd)
+shutil.move(file_now,file_back)
+ 
+#重置nginx日志
+pid_path = "%s/%s" % (path[0],path[2])
+f = open(pid_path)
+pid = f.readline()
+pid = pid.strip()
+command = "kill -USR1 %s" % pid
+os.system(command)
+f.close()

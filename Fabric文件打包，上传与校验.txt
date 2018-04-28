@@ -1,0 +1,63 @@
+【Python】Fabric文件打包，上传与校验
+转载 2015年02月12日 18:58:26 4604
+概述：
+
+用pip安装fabric， (使用SSH协议)
+将本地文件打包， 发送到目标主机，校对文件的md5sum 
+代码：
+
+[python] view plain copy
+#!/usr/bin/env python  
+#-*- coding: utf-8 -*-  
+from fabric.api import *  
+from fabric.context_managers import *  
+from fabric.contrib.console import confirm  
+  
+#定义目标主机信息  
+env.user='root'  
+env.hosts=['192.168.1.21','192.168.1.22','192.168.1.23']  
+env.password='SKJh935yft#'  
+  
+#打包文件  
+@task  
+@runs_once  
+def tar_task():  
+    with lcd("/data/logs"):  
+        local("tar -czf access.tar.gz access.log")  
+  
+#上传文件  
+@task  
+def put_task():  
+    run("mkdir -p /data/logs")  
+    with cd("/data/logs"):  
+        with settings(warn_only=True):  
+            result = put("/data/logs/access.tar.gz", "/data/logs/access.tar.gz")  
+        if result.failed and not confirm("put file failed, Continue[Y/N]?"):  
+            abort("Aborting file put task!")  
+  
+#校对文件  
+@task  
+def check_task():  
+    with settings(warn_only=True):  
+        lmd5=local("md5sum /data/logs/access.tar.gz",capture=True).split(' ')[0]  
+        rmd5=run("md5sum /data/logs/access.tar.gz").split(' ')[0]  
+    if lmd5==rmd5:  
+        print "OK"  
+    else:  
+        print "ERROR"  
+  
+#3个功能一起实现  
+@task  
+def go():  
+    tar_task()  
+    put_task()  
+    check_task()  
+
+
+使用：
+
+
+fab -f xxx.py tar_task         #文件打包
+fab -f xxx.py put_task        #文件上传
+fab -f xxx.py check_task    #文件校对
+fab -f xxx.py go                  #打包，上传和校对

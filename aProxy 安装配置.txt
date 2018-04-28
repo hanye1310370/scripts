@@ -1,0 +1,109 @@
+aProxy: 带认证授权和权限控制的反向代理
+
+前段时间很多数据库因为没有做好权限控制暴露在外网被删然后遭勒索的事件，而类似的有些内网的web服务也会被开放到公网并且没有做任何权限控制的，这样也会有一定的风险。所以就决定写篇文章简单介绍一个小工具。
+
+aProxy是做什么用的
+
+例如我们有很多服务，例如Hadoop、Aerospke、Riak等，都会有一些监控的web界面，我们需要查看这些线上服务的情况，但是又不能完全将这些服务开放到外网，让别人看到，这时候我们可能的做法是通过拨VPN，或者是通过Nginx的BaseAuth验证，又或者是简单的本地绑定ip和host来访问，这些方法管理和维护起来都不方便；有些人为了方便甚至是完全开放到外网，谁人都可以自由访问。所以我们写了一个简单的小工具aProxy来解决这个问题。
+
+下面有两个服务用于演示的，试着访问下面两个服务（转到登录界面时请点底部的Github登录）：
+
+http://cronsun.aproxy.rtbdev.com/ui/ ： 登录后就能访问
+http://hadoop.aproxy.rtbdev.com/ : 登录后会提示没有权限，还是无法访问
+aProxy通过设定upstream来做反向代理：
+
+NewImage
+
+UpStream的地址通常我们使用内网地址，这样就不需要将服务开放到外网了。
+
+ 对于资源的开放程度有三种类型：
+
+Public： 完全开放，谁人都可以访问
+Need Login：需要登录才可以访问
+Need Authority：需要授权才可以访问
+然后通过授权管理来开放特定的服务给特定的用户，aProxy的授权规则是基于email和URL的。
+
+NewImage 
+
+ 
+
+这里设定了两个服务，一个是只需登录就能访问的分布式的定时任务系统cronsun，一个是必须授权才能访问的Hadoop dfshealth服务，你们可以直接分别访问这两个地址就能感受到aProxy是个什么样的作用了。(登录界面请用底部的Github登录）
+
+aProxy安装
+安装aProxy可以选择从 https://github.com/shunfei/aproxy/releases 直接下载编译好的二进制文件：
+
+tar xzvf aproxy-v0.1-xxxx-xxx-xx.tar.gz 
+cd aproxy-v0.1-xxxx-xxx-xx 
+cp conf/aproxy.toml.example conf/aproxy.toml
+如果你熟悉go语言，也可以从源码编译：
+
+cd $GOPATH/src 
+git clone https://github.com/shunfei/aproxy.git 
+cd aproxy 
+sh ./install.sh
+运行aProxy
+
+在运行aProxy之前，需要先准备好 MongoDB 和 Redis（其中MongoDB是用于配置存储，Redis用于session存储），然后修改conf/aproxy.toml里面相应的配置，就可以运行aProxy了：
+
+./bin/aproxy -c conf/aproxy.toml
+数据库里面现在是没有用户的，所以我们加一个用户到数据库里面：
+
+./bin/adduser -c conf/aproxy.toml -action adduser -email yourname@gmail.com -pwd passwordxxx
+接着将这个用户设置为Admin：
+
+./bin/adduser -c conf/aproxy.toml -action setadmin -email yourname@gmail.com -adminlevel 99
+现在你可以访问 http://127.0.0.1:8098/-_-aproxy-_-/  并开始设置aProxy，开心的开始使用了。
+
+aProxy的域名相关配置
+
+aProxy的反向代理是基于域名配置的，而aProxy需要验证用户的登录情况则需要获取到登录后的cookie，所以aProxy的服务需要基于子域名来配置：
+
+aproxy.domain.com
+mongodb-mms.aproxy.domain.com
+hadoop.aproxy.domain.com
+aerospike.aproxy.domain.com
+如上的域名列表，aproxy.domain.com 则用于aproxy的登录域名，其他的子域名则为相应服务的域名，这样当登录后，子域名（例如 hadoop.aproxy.domain.com）就可以读取到上一级域名的cookie数据，获取到登录状态。所以我们aProxy的Nginx配置大概如下：
+
+复制代码
+server {
+ listen 80;
+ server_name aproxy.domain.com *.aproxy.domain.com;
+ location / {
+   include proxy.conf;
+   # pass to aproxy
+   proxy_pass http://127.0.0.1:8098;
+ }
+}
+复制代码
+这样我们就可以设置一个泛域名解析 *.aproxy.domain.com 到这台Nginx服务器了。
+然后还需要修改 conf/aproxy.toml 里面的和域名相关的配置：
+
+loginHost = "http://aproxy.domain.com"
+[session]
+   domain = "aproxy.domain.com"
+和公司内部用户帐号系统集成
+
+aProxy是基于golang写的，所以这需要你们对go语言有基本的了解。
+aProxy提供了一个基于MongoDB存储的用户系统，不过很多时候我们希望和公司内部的帐号系统进行集成，方便员工使用。这时候我们就可以实现aProxy位于aproxy/module/auth/UserStorager的UserStorager的接口：
+
+复制代码
+type UserStorager interface {
+   Login(email, pwd string) (*User, error)
+   GetByEmail(email string) (*User, error)
+   GetAll() ([]User, error)
+   // add new user.
+   // user.Pwd field has encrypted.
+   Insert(user User) error
+   Update(id string, user User) error 
+}
+复制代码
+通常情况下对于集成公司内部的用户帐号系统的，我们并不需要使用aProxy来管理用户信息，所以我们只需实现接口的Login(email, pwd string) (*User, error)这一个方法就可以。
+在实现了aproxy/module/auth/UserStorager接口后， 我们需要修改 aproxy/bin/main.go 里面的一些代码，使用你自己实现的用户存储接口：
+
+//file: aproxy/bin/main.go
+//delete this line:
+// auth.SetUserStorageToMongo() 
+
+//add this code, to register your own UserStorager to aproxy 
+auth.SetUserStorage(&yourUserStorage{})
+如果想增加oAuth的登录验证，则实现 module/oauth/Oauther 接口就可以，具体可以参考 loginservices/github 的实现。

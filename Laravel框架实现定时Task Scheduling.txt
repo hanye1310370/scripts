@@ -1,0 +1,15 @@
+问题描述：在网站开发中，需要经常开启一些定时任务，例如定时清理脏数据等。本文主要介绍使用laravel自带的Task Scheduling配合cron实现定时任务。
+
+编写定时任务 
+在laravel框架的App\Console\Kernel.php目录下编写你需要执行的定时任务。例如：
+
+$schedule->call(function () {
+    XXXXXX
+})->hourly();
+程序会一个小时执行一次。
+
+开启定时任务 
+在linxu系统下开启定时任务只需要两步：
+
+打开crontab，执行：crontab -e
+添加定时任务，* * * * * php /path/to/artisan schedule:run >> /dev/null 2>&1。这个语句是每分钟执行一次schedule。

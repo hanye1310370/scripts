@@ -1,0 +1,59 @@
+我只想要Linux的IP地址
+原创潇雨20172018-01-01 15:04:41评论(1)616人阅读
+大家都知道ifconfig 可以查看centos的ip地址，但是我如果只要ip地址该怎么办呢？
+首先上ifconfig
+
+[root@centos ~]# ifconfig eth0 
+eth0      Link encap:Ethernet  HWaddr 00:50:56:94:7D:88  
+          inet addr:10.10.9.110  Bcast:10.10.9.255  Mask:255.255.255.0
+          inet6 addr: fe80::250:56ff:fe94:7d88/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:633616 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:341279 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:970671417 (925.7 MiB)  TX bytes:43671671 (41.6 MiB)
+我现在想把ip地址所在的第2行取出来：
+
+[root@centos ~]# ifconfig eth0 | awk 'NR==2'
+          inet addr:10.10.9.110  Bcast:10.10.9.255  Mask:255.255.255.0
+或者通过grep来取也可以
+
+[root@centos ~]# ifconfig eth0 | grep Mask
+          inet addr:10.10.9.110  Bcast:10.10.9.255  Mask:255.255.255.0
+在此基础之上，把ip地址取出来
+
+[root@centos ~]# ifconfig eth0 | awk 'NR==2 {print $2}' 
+addr:10.10.9.110  //此时还需要一个管道把前面的addr:去掉即可
+
+[root@centos ~]# ifconfig eth0 | awk 'NR==2 {print $2}' | awk -F ":" '{print $2}'
+10.10.9.110
+换一种思路，用cut命令
+
+cut 截取命令，-d " " 用引号内符号分割，-f n n代表分割之后的区域
+
+[root@centos ~]# ifconfig eth0 | grep Mask | cut -d ":" -f2 | cut -d " " -f1
+10.10.9.110
+第三种方法，awk的高级用法
+
+awk命令通过-F "[ : ]+" 可以使用多个分隔符分割文本
+
+[root@centos ~]#  ifconfig | grep "Bcast" | awk -F "[: ]+" '{print $4}'
+10.10.9.110
+第四种方法，我可以在ifcfg-eth0配置文件上动脑筋
+
+[root@centos ~]# grep IPADDR /etc/sysconfig/network-scripts/ifcfg-eth0 | cut -d "=" -f2
+10.10.9.110
+第五种方法，可以叫做野路子，获取到的是外网ip
+
+[root@centos ~]# curl ifconfig.me
+第六种方法，只用sed
+
+[root@centos ~]# ifconfig eth0 | sed -n '/inet addr/p' | sed 's#^.*addr:##g' | sed 's# Bc.*$##g'
+10.10.9.110
+第七种方法 我还运用的不熟练
+
+sed的反向匹配
+
+[root@centos ~]# ifconfig eth0 | sed -n 's#^.*addr:\(.*\) Bcas.*$#\1#gp'
+10.10.9.110
+说了这么多，发现linux命令博达而精深，只有膜拜的份了。

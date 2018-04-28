@@ -1,0 +1,420 @@
+# 自动化部署erp系统步骤 #
+
+## 一、给定参数： ##
+
+			1、目标主机： 目标主机为公司服务器集群的资源主机，这个主机的选择必须是可用资源的选择，操作人员能够自由选择
+
+			2、erp网站名称： erp网站名称操作员得根据业务情况认真选择 ，前面操作选定后面部署操作就会执行。
+
+			3、数据库：
+					数据库信息内容： 几个选择内容必须为可用资源，操作人必须充分了解所要部署的erp网站的业务所属来对应选择数据库资源
+						1、 数据库服务器地址
+						2、 数据库名
+						3、 数据库端口
+						4、 数据库用户
+						5、 数据库密码
+
+			4、redis：
+					redis信息内容： 同数据库信息一样、操作人要考虑业务选择资源
+						1、 redis服务器地址
+						2、 redis密码
+						3、 redis端口
+						4、 一套erp系统需要占用3个redis db库 db库的选择要选择没有被使用到的
+			
+
+			5、域名：
+					域名使用erp网站名称加主域名方式来定义域名，所以操作人在自动部署erp网站的时候要考虑好erp网站的名称。
+
+					例如 erp网站名称为 jiaozuo 那么加上主域名1fangxin.net, erp的域名就为 jiaozuo.1fangxin.net
+
+			6、目录：
+					目录同样在此自动部署方案中使用erp网站名称。
+
+## 二、自动化部署erp系统使用jenkins来实现 ##
+
+			1、 jenkins创建项目，使用字符串参数化来实现给定参数传入
+
+			2、 构建操作使用shell方式执行创建好的脚本deploy_erp.sh 来source进去 jenkins传入的参数变量来执行。
+
+			3、 jenkins外部操作使用调用jenkins api 来传入json格式的数据 来参数化构建 job	（api 方式为了后期如果有运维管理平台可以调用）
+
+			4、 为了简单实现，本次用python-jenkins模块调用jenkins api方式来进行触发构建
+
+
+## 三、方案内容 ##
+
+			1、jenkins项目地址： http://39.106.148.41:8080/job/deploy_erp/ 用户名 admin 密码：wangweiQQ123
+
+			2、python脚本内容：
+
+				# pip3 install python-jenkins
+				# 此脚本需要python3版本
+
+
+			  	import jenkins --------------------------------------------------- 导入jenkins模块
+				jenkins_server_url='http://39.106.148.41:8080' ------------------- jenkins地址变量
+				job_name='deploy_erp' -------------------------------------------- jenkins job 名称
+				user_id='admin' -------------------------------------------------- jenkins用户ID
+				api_token='4e88588301e4298bcd8ea01e9cb315fb'---------------------- jenkins用户的api token
+				server=jenkins.Jenkins(jenkins_server_url,username=user_id,password=api_token) ---------------------- 创建对象，传入各变量值
+				param_dict={
+				            'host':'172.17.237.48',
+				            'website':'sofa',
+				            'redis_ip':'172.17.237.48', ----------------------------- 创建构建参数字典
+				            'redis_pw':'123456',
+				            'redis_port':'6379',
+				            'db1':'5',
+				            'db2':'6',
+				            'db3':'7',
+				            'DBCONN':'172.17.237.48',
+				            'DBNAME':'sofa',
+				            'DBUSER':'sofa',
+				            'DBUSERPW':'123456'
+				            }
+				server.build_job(job_name,parameters=param_dict) -------------------- 对象调用build 方法传入 job名称，构建参数字典 触发构建
+
+			3、 shell脚本： 此脚本中所有的变量都来自于 jenkins定义的参数化构建参数
+				
+				#!/bin/bash
+				# Author: wangwei
+				# Email: 1046679050@qq.com
+				#
+				# 此脚本用于自动化创建erp系统
+				#
+				 
+				# 定义全局变量
+
+				source /home/erp/name.txt ------------------- 引入变量
+
+				ENV_EAM="/home/erp/example/.env.exp"
+
+				NGINX_EAM="/home/erp/example/www.example.com.conf"
+
+				ssh $host "ls -d $website" > /dev/null 2>&1 -------------- 判断网站是否创建，如果已创建，退出脚本，未创建就创建此网站名称的代码目录
+
+				if [ $? -eq 0 ]
+				   then
+				     echo "$website is already existed" && exit 33
+				else
+				   ssh $host "pwd && mkdir $website && ls -d $website"
+				fi
+				
+				# ---------------------------------
+				    
+				        echo  " 获取代码 "
+				        ssh $host "cd $website && git clone http://deployuser:fangxin12300.@gitlab.1fangxin.cn/fangxin-tech/erp.git" &&\
+				        echo "###########################" 
+				        ssh $host "cd $website/erp && ls -l"
+				        echo "###########################\n" 
+				        echo "修改.env文件中域名配置 \n"
+				        scp ${ENV_EAM} ${host}:~/$website/erp/.env && \
+				        ssh $host "cd ${website}/erp && sed -i 's#APP_LOCAL=#APP_LOCAL=${website}#g' .env" && \
+				        ssh $host "cd ${website}/erp && sed -i 's#admin.fx.com#${website}-admin.fx.com#g' .env" && \
+				        ssh $host "cd ${website}/erp && sed -i 's#member.fx.com#${website}.fx.com#g' .env" && \
+				        ssh $host "cd ${website}/erp && sed -i 's#api.fx.com#${website}-api.fx.com#g' .env" && \
+				        ssh $host "cd ${website}/erp && sed -i 's#website.fx.com#${website}-website.fx.com#g' .env" && \
+				        ssh $host "cd ${website}/erp && sed -i 's#wap.fx.com#${website}-wap.fx.com#g' .env" && \
+				
+				
+				# 修改redis配置
+				    
+				        echo "\n 修改.env文件中的redis配置 \n"
+				        ssh $host "cd ${website}/erp && sed -i 's#REDIS_HOST=#REDIS_HOST=${redis_ip}#g' .env" && \
+				        ssh $host "cd ${website}/erp && sed -i 's#REDIS_PASSWORD=#REDIS_PASSWORD=${redis_pw}#g' .env" && \
+				        ssh $host "cd ${website}/erp && sed -i 's#REDIS_PORT=#REDIS_PORT=${redis_port}#g' .env" && \
+				        ssh $host "cd ${website}/erp && sed -i 's#NO_0=#NO_0=${db1}#g' .env" && \
+				        ssh $host "cd ${website}/erp && sed -i 's#NO_1=#NO_1=${db2}#g' .env" && \
+				        ssh $host "cd ${website}/erp && sed -i 's#NO_2=#NO_2=${db3}#g' .env" && \
+
+				# 查看数据库列表及创建数据库，修改.env文件database配置
+				# 数据库列表
+				
+				         echo  "\n 修改.env文件中数据库信息 \n"
+				         echo  "\n 正在创建数据库........... \n"
+				
+				         if [ ${DBCONN} = '172.17.237.48' ]
+				           then
+				    	       mysql -uroot -pwangweiQQ123 -h${DBCONN} -e "create database ${DBNAME};"
+				    	       mysql -uroot -pwangweiQQ123 -h${DBCONN} -e "grant all on ${DBNAME}.* to '${DBUSER}'@'%' identified by '${DBUSERPW}';flush privileges;"
+				         elif [ $DBCONN = '172.17.237.49']
+				           then
+				    	      echo "......................."
+				         fi
+				    
+				
+				# 修改.env文件数据库内容
+
+				         ssh $host "cd ${website}/erp && sed -i 's/DB_HOST=/DB_HOST=${DBCONN}/g' .env" && \
+				         ssh $host "cd ${website}/erp && sed -i 's/DB_USERNAME=/DB_USERNAME=${DBUSER}/g' .env" && \
+				         ssh $host "cd ${website}/erp && sed -i 's/DB_PASSWORD=/DB_PASSWORD=${DBUSERPW}/g' .env" && \
+				         ssh $host "cd ${website}/erp && sed -i 's/DB_DATABASE=/DB_DATABASE=${DBNAME}/g' .env"
+				
+				#定义设置nginx配置文件
+
+				         vhost="/usr/local/nginx/conf/vhost"
+				         echo  "\n 配置nginx配置文件 \n"
+				         scp ${NGINX_EAM} root@${host}:${vhost}/${website}.fx.com.conf && \
+				         ssh root@${host} "cd ${nginx_vhost} && sed -i 's#admin.fx.com#${website}-admin.fx.com#g' ${vhost}/${website}.fx.com.conf" && \
+				         ssh root@${host} "cd ${nginx_vhost} && sed -i 's#member.fx.com#${website}.fx.com#g' ${vhost}/${website}.fx.com.conf" && \
+				         ssh root@${host} "cd ${nginx_vhost} && sed -i 's#api.fx.com#${website}-api.fx.com#g' ${vhost}/${website}.fx.com.conf" && \
+				         ssh root@${host} "cd ${nginx_vhost} && sed -i 's#website.fx.com#${website}-website.fx.com#g' ${vhost}/${website}.fx.com.conf" && \
+				         ssh root@${host} "cd ${nginx_vhost} && sed -i 's#wap.fx.com#${website}-wap.fx.com#g' ${vhost}/${website}.fx.com.conf" & \
+				         ssh root@${host} "cd ${nginx_vhost} && sed -i 's#webroot#${website}#g' ${vhost}/${website}.fx.com.conf" &
+				         ssh root@${host} "/usr/local/nginx/sbin/nginx -t"
+				
+				# erp环境配置 gulp composer 数据库初始化
+				
+				         echo  "\n erp环境配置 gulp composer 数据库初始化 \n"
+				         ssh $host "cd ${website}/erp && yarn add gulp" && \
+				         ssh $host "cd ${website}/erp && gulp" && \
+				         ssh $host "cd ${website}/erp && composer install" && \
+				         ssh $host "cd ${website}/erp && php artisan optimize" && \
+				         ssh $host "cd ${website}/erp && php artisan  migrate --force" && \
+				         ssh $host "cd ${website}/erp && php artisan  queue:restart" && \
+				         ssh $host "cd ${website}/erp && chmod 777 storage/ -R && chmod 777 bootstrap/cache/ -R"
+				
+				
+					
+				# 给出所有传入的值：
+					
+				         echo "\n 新部署的${website}环境信息如下\n"
+				         echo "ECS服务器:${host}"
+				         echo "-----------------------------------------------------\n"
+				         ssh $host "cd ${website}/erp && grep 'URL' .env && grep 'DB_' .env|grep -v 'DB_WWW' && grep 'REDIS_' .env"
+				         echo "\n-----------------------------------------------------"
+
+			4、直接使用curl命令构建：
+				
+				1、获取jenkins-crumb
+
+				curl -u admin:4e88588301e4298bcd8ea01e9cb315fb http://39.106.148.41:8080/crumbIssuer/api/json
+
+				{"_class":"hudson.security.csrf.DefaultCrumbIssuer","crumb":"b25141649a02d0e16d9e8591266b53ca","crumbRequestField":"Jenkins-Crumb"}
+
+				2、使用api构建任务
+				
+				curl -u admin:wangweiQQ123 -H "Jenkins-Crumb:b25141649a02d0e16d9e8591266b53ca" -X POST "http://39.106.148.41:8080/job/deploy_erp/buildWithParameters?token=4e88588301e4298bcd8ea01e9cb315fb&host=172.17.237.48&website=bebian&redis_ip=172.17.237.48&redis_pw=123456&redis_port=6379&db1=2&db2=3&db3=4&DBCONN=172.17.237.48&DBNAME=debian&DBUSER=debian&DBUSERPW=123456"
+
+				curl -u admin:4e88588301e4298bcd8ea01e9cb315fb -H "Jenkins-Crumb:b25141649a02d0e16d9e8591266b53ca" -X POST "http://39.106.148.41:8080/job/deploy_erp/buildWithParameters?host=172.17.237.48&website=bebian&redis_ip=172.17.237.48&redis_pw=123456&redis_port=6379&db1=2&db2=3&db3=4&DBCONN=172.17.237.48&DBNAME=debian&DBUSER=debian&DBUSERPW=123456"
+
+
+
+				
+				
+## 最后附送完全脚本交互传参部署erp系统的脚本 ## 
+
+
+			#!/bin/bash
+			# Author: wangwei
+			# Email: 1046679050@qq.com
+			#
+			# 此脚本用于自动化创建erp系统、所有给定参数都是用read读入交互方式传入
+			#
+			 
+			# 定义全局变量
+			
+			ENV_EAM="/home/erp/example/.env.exp"
+			NGINX_EAM="/home/erp/example/www.example.com.conf"
+			
+			# ---------------------------------
+			
+			while true
+			  do
+			    # 给出ECS主机列表
+			    echo "\n -------------------------------- \n"
+
+			    cat <<EOF
+			        可选择的ECS服务器地址:
+			           172.17.237.49
+			           172.17.237.48
+			EOF
+			
+			    # 传入主机变量值
+			
+			    read -p "请选择目标主机部署erp系统: " host
+			    if [ -z $host ]
+			       then
+			          exit 44
+			    fi
+			
+			    # 传入web目录变量值
+			
+			    read -p "请输入一个网站前缀用于代码目录名及网站域名前缀:[很重要]: " website
+			    if [ -z $website ]
+			       then
+			       exit 44
+			    fi
+			
+			    # 传入redis各变量值
+			    cat <<EOF
+			        redis-server地址：
+			            172.17.237.49 passwd=null port=6379
+			            
+			            172.17.237.48 passwd=null port=6379
+			EOF
+			        echo "\n 查看本地所有erp环境对redis db 的使用情况 \n" 
+			        ssh $host "find ./ -name '.env'|xargs grep 'REDIS'" && \
+			        read -p "please input redis-server ip: " redis_ip && \
+			        read -p "please input redis-server password: " redis_pw && \
+			        read -p "please input redis-server port: " redis_port && \
+			        read -p "please input redis-server REDIS_NO_0: " db1 && \
+			        read -p "please input redis-server REDIS_NO_1: " db2 && \
+			        read -p "please input redis-server REDIS_NO_2: " db3 && \
+			
+			    # 传入数据库各变量值
+			
+			    cat <<EOF
+			    数据库服务器地址:
+			              172.17.237.49
+			              172.17.237.48
+			EOF
+			
+			    # 选择数据库地址
+			        read -p "请选择一个数据库服务器地址: " DBCONN && \
+			        read -p "请选择一个数据库名做为所创建erp的数据库: " DBNAME && \
+			        read -p "请为此数据库创建一个数据库用户名: " DBUSER && \
+			        read -p "请为数据库用户${DBUSER}创建密码: " DBUSERPW
+			    
+			    # 定义拉取代码部署erp环境函数
+			
+			    pull_code(){
+			        echo  "\n 获取代码 \n"
+			        ssh $host "cd $website && git clone http://deployuser:fangxin12300.@gitlab.1fangxin.cn/fangxin-tech/erp.git" &&\
+			        echo "###########################" 
+			        ssh $host "cd $website/erp && ls -l"
+			        echo "###########################\n" 
+			        echo "修改.env文件中域名配置 \n"
+			        scp ${ENV_EAM} ${host}:~/$website/erp/.env && \
+			        ssh $host "cd ${website}/erp && sed -i 's#APP_LOCAL=#APP_LOCAL=${website}#g' .env" && \
+			        ssh $host "cd ${website}/erp && sed -i 's#admin.fx.com#${website}-admin.fx.com#g' .env" && \
+			        ssh $host "cd ${website}/erp && sed -i 's#member.fx.com#${website}.fx.com#g' .env" && \
+			        ssh $host "cd ${website}/erp && sed -i 's#api.fx.com#${website}-api.fx.com#g' .env" && \
+			        ssh $host "cd ${website}/erp && sed -i 's#website.fx.com#${website}-website.fx.com#g' .env" && \
+			        ssh $host "cd ${website}/erp && sed -i 's#wap.fx.com#${website}-wap.fx.com#g' .env" && \
+			
+			       cat <<EOF
+			             域名信息：
+			                  ${website}-admin.fx.com 
+			                  ${website}.fx.com 
+			                  ${website}-api.fx.com 
+			                  ${website}-website.fx.com 
+			                  ${website}-wap.fx.com 
+			EOF
+			
+			       # 修改redis配置
+			    
+			         echo "\n 修改.env文件中的redis配置 \n"
+			         ssh $host "cd ${website}/erp && sed -i 's#REDIS_HOST=#REDIS_HOST=${redis_ip}#g' .env" && \
+			         ssh $host "cd ${website}/erp && sed -i 's#REDIS_PASSWORD=#REDIS_PASSWORD=${redis_pw}#g' .env" && \
+			         ssh $host "cd ${website}/erp && sed -i 's#REDIS_PORT=#REDIS_PORT=${redis_port}#g' .env" && \
+			         ssh $host "cd ${website}/erp && sed -i 's#NO_0=#NO_0=${db1}#g' .env" && \
+			         ssh $host "cd ${website}/erp && sed -i 's#NO_1=#NO_1=${db2}#g' .env" && \
+			         ssh $host "cd ${website}/erp && sed -i 's#NO_2=#NO_2=${db3}#g' .env" && \
+
+			         # 查看数据库列表及创建数据库，修改.env文件database配置
+			         # 数据库列表
+			
+			         echo  "\n 修改.env文件中数据库信息 \n"
+			         echo  "\n 正在创建数据库........... \n"
+			
+			         if [ ${DBCONN} = '172.17.237.48' ]
+			           then
+			    	       mysql -uroot -pwangweiQQ123 -h${DBCONN} -e "create database ${DBNAME};"
+			    	       mysql -uroot -pwangweiQQ123 -h${DBCONN} -e "grant all on ${DBNAME}.* to '${DBUSER}'@'%' identified by '${DBUSERPW}';flush privileges;"
+			         elif [ $DBCONN = '172.17.237.49']
+			           then
+			    	      echo "......................."
+			         fi
+			    
+			       # 打印出创建的数据库信息
+			         cat <<EOF
+			                数据库创建完成：
+			                数据库地址: ${DBCONN}
+			                数据库名称: ${DBNAME}
+			                数据库用户: ${DBUSER}
+			                数据库密码: ${DBUSERPW}
+			EOF
+			
+			         # 修改.env文件数据库内容
+			         ssh $host "cd ${website}/erp && sed -i 's/DB_HOST=/DB_HOST=${DBCONN}/g' .env" && \
+			         ssh $host "cd ${website}/erp && sed -i 's/DB_USERNAME=/DB_USERNAME=${DBUSER}/g' .env" && \
+			         ssh $host "cd ${website}/erp && sed -i 's/DB_PASSWORD=/DB_PASSWORD=${DBUSERPW}/g' .env" && \
+			         ssh $host "cd ${website}/erp && sed -i 's/DB_DATABASE=/DB_DATABASE=${DBNAME}/g' .env"
+			    }
+			
+			#定义设置nginx配置文件
+			    nginx_cnf(){
+			            vhost="/usr/local/nginx/conf/vhost"
+			            echo  "\n 配置nginx配置文件 \n"
+			            scp ${NGINX_EAM} root@${host}:${vhost}/${website}.fx.com.conf && \
+			            ssh root@${host} "cd ${nginx_vhost} && sed -i 's#admin.fx.com#${website}-admin.fx.com#g' ${vhost}/${website}.fx.com.conf" && \
+			            ssh root@${host} "cd ${nginx_vhost} && sed -i 's#member.fx.com#${website}.fx.com#g' ${vhost}/${website}.fx.com.conf" && \
+			            ssh root@${host} "cd ${nginx_vhost} && sed -i 's#api.fx.com#${website}-api.fx.com#g' ${vhost}/${website}.fx.com.conf" && \
+			            ssh root@${host} "cd ${nginx_vhost} && sed -i 's#website.fx.com#${website}-website.fx.com#g' ${vhost}/${website}.fx.com.conf" && \
+			            ssh root@${host} "cd ${nginx_vhost} && sed -i 's#wap.fx.com#${website}-wap.fx.com#g' ${vhost}/${website}.fx.com.conf" & \
+			            ssh root@${host} "/usr/local/nginx/sbin/nginx -t && /usr/local/nginx/sbin/nginx -s reload"
+
+			    }
+			
+			# erp环境配置 gulp composer 数据库初始化
+			
+			    erp_init(){
+			            echo  "\n erp环境配置 gulp composer 数据库初始化 \n"
+			            ssh $host "cd ${website}/erp && yarn add gulp" && \
+			            ssh $host "cd ${website}/erp && gulp" && \
+			            ssh $host "cd ${website}/erp && composer install" && \
+			            ssh $host "cd ${website}/erp && php artisan optimize" && \
+			            ssh $host "cd ${website}/erp && php artisan  migrate --force" && \
+			            ssh $host "cd ${website}/erp && php artisan  queue:restart" && \
+			            ssh $host "cd ${website}/erp && chmod 777 storage/ -R && chmod 777 bootstrap/cache/ -R"
+			    }
+			
+			    main(){
+			             pull_code
+			             nginx_cnf
+			             erp_init
+			             echo "\n 新部署的${website}环境信息如下\n"
+			             echo "ECS服务器:${host}"
+			             echo "-----------------------------------------------------\n"
+			             ssh $host "cd ${website}/erp && grep 'URL' .env && grep 'DB_' .env|grep -v 'DB_WWW' && grep 'REDIS_' .env"
+			             echo "\n-----------------------------------------------------"
+			    }
+			
+				
+			# 给出所有传入的值：
+			    cat <<EOF
+			          网站名称: ${website}
+			          redis服务器地址: $redis_ip
+			          redis密码: $redis_pw
+			          redis端口: $redis_port
+			          redisdb1: $db1
+			          redisdb2: $db2
+			          redisdb3: $db3
+			          数据库地址: $DBCONN
+			          数据库名字: $DBNAME
+			          数据库用户: $DBUSER
+			          数据库密码: $DBUSERPW
+			EOF
+				
+			# 给脚本执行者提示是否开始执行创建环境：
+			     read -p "请确认信息正确，选择执行与否: y/n: " action
+			     case $action in
+			                y|Y)
+			                    # 判断并创建代码目录#       
+			                      ssh $host "ls -d $website" > /dev/null 2>&1
+			                      if [ $? -eq 0 ]
+			                          then 
+			                              echo "$website is already existed" && exit 33
+			                      else
+			                              ssh $host "pwd && mkdir $website && ls -d $website"
+			                      fi        
+			                      main
+			                      ;;
+			                 n|N)
+			                      continue
+			                      ;;
+			                   *)
+			                      break
+			                      ;;
+			     esac
+			done

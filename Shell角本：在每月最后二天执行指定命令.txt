@@ -1,0 +1,26 @@
+昨天有个朋友在群里问：只在每个月最后倒数两日执行 一条命令？ 
+他的理解是只执行一条命令，而不是脚本。 
+我想想，好像还真找不出一个命令可以完成这个操作，除非脚本中的所有语句全部写到一行里。 
+但是我认为在实际的运维工作中能解决实际问题就可以，不用纠结于是一条命令还是脚本。毕竟，写入到计划任务/etc/crontab中的执行一条命令和执行一个脚本，本质没有什么区别。
+
+代码部分：
+
+#!/bin/bash
+#取得当前日期的天数部分
+today=`date +%d`
+#取得本月最后一天的天数部分
+last_first_day=`echo $today | xargs -I{} date -d '+1 month -{} day' +%d`
+#取得本月倒数第二天的天数部分
+last_second_day=`echo $today | xargs -I{} date -d '+1 month -{} day -1 day' +%d`
+#通过比较当前日期和倒数第二天的天数部分还决定是否执行指定命令
+if [ $today -ge $last_second_day ]; then
+    echo "Today is last two days of this month!"
+else
+    echo "Today is not last two days of this month!"
+fi
+
+这里没有用上变量last_first_day（本月最后一天的天数部分） ，我只是列出来计算方法，备用。
+
+然后将脚本加入到 /etc/crontab中每天执行一次就可以了：
+
+0 0 */1 * * root 角本名称

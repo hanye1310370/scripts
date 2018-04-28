@@ -1,0 +1,34 @@
+问题描述：在使用Laravel框架实现动态网页时，若有些操作计算量较大，为了不影响用户体验，往往需要使用异步方式去处理。这里使用supervisor和laravel自带的queues实现。
+
+Supervisor (http://supervisord.org) 是一个用 Python 写的进程管理工具，可以很方便的用来启动、重启、关闭进程（不仅仅是 Python 进程）。除了对单个进程的控制，还可以同时启动、关闭多个进程，比如很不幸的服务器出问题导致所有应用程序都被杀死，此时可以用 supervisor 同时启动所有应用程序而不是一个一个地敲命令启动。 
+1. 安装supervisor
+
+    apt-get install supervisor
+    安装完后重启supervisor：service supervisor restart
+2. 配置supervisor文件
+
+[program:laravel]
+process_name=%(program_name)s_%(process_num)02d
+command=php {{ app.root }}/artisan queue:listen
+autostart=true
+autorestart=true
+user=www-data
+numprocs=1
+redirect_stderr=true
+stdout_logfile={{ app.root }}/storage/logs/queque.log
+这里配置了supervisor管理的进程指令，用于启动laravel队列的监听。同时指定了进程数和错误日志地址。 
+3. queue配置 
+编写队列代码之前，需要配置queue，其配置位置在config/queue.php中，在这里你需要配置你的队列驱动器，例如数据库、redis、同步等。不同的选择都有相应的配置。我这里选择redis进行配置。例如：
+
+'redis' => [
+        'driver' => 'redis',
+        'connection' => env('QUEUE_CONNECTION', 'default'),
+        'queue'  => 'wordtohtml',
+        'expire' => 600,
+    ],
+4. 编写异步程序 
+异步成程序在app/job目录下编写，新建一个自己的类，例如：Shutdown，编写类的构造函数和handle函数。handle函数中是程序计算过程。 
+5. 执行异步函数
+
+$this->dispatch(new Shutdown($vimd));
+使用这一条指令就可以创建一个异步程序。

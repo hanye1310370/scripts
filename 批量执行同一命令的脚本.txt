@@ -1,0 +1,20 @@
+erp@huabei-slave:~/deploy_shell$ vi all.sh 
+
+#!/bin/bash
+# huabei001
+#DIR=$(find /home/erp/ -name ".env"|sed 's/.env//g')
+DIR=$(find /home/erp/ -name ".env" -exec dirname {} \;)
+for i in $DIR
+  do
+   cd $i && \
+   # 脚本1
+   /usr/local/php/bin/php artisan hot-fix-wlt 
+#/bin/ls -l
+  if [ $? -eq 0 ]
+ then
+   echo ${i##*/} finished
+  else
+   echo ${i##*/} failed
+exit 3
+  fi
+done

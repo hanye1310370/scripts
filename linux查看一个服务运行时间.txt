@@ -1,0 +1,59 @@
+
+ps -eo lstart 启动时间 
+ps -eo etime 运行多长时间.
+
+ps -eo pid,lstart,etime | grep PID
+linux查看某个服务具体启动时间:
+
+ps -p PID -o lstart,  其中，PID为某个进程的进程ID号
+
+
+root@iZ2ze3xrghth6n3ty61c33Z:~# ps -A -opid,stime,etime,args|grep nginx
+ 5398 Sep21  6-14:39:48 nginx: master process /usr/local/nginx/sbin/nginx -c /usr/local/nginx/conf/nginx.conf
+11173 13:49       00:00 grep --color nginx
+81606 10:43    03:06:08 nginx: worker process                                          
+81607 10:43    03:06:08 nginx: worker process                                          
+81609 10:43    03:06:08 nginx: worker process                                          
+81610 10:43    03:06:08 nginx: worker process                                          
+81612 10:43    03:06:08 nginx: worker process                                          
+81613 10:43    03:06:08 nginx: worker process                                          
+81614 10:43    03:06:08 nginx: worker process                                          
+81615 10:43    03:06:08 nginx: worker process                                          
+81617 10:43    03:06:08 nginx: worker process                                          
+81618 10:43    03:06:08 nginx: worker process                                          
+81620 10:43    03:06:08 nginx: worker process                                          
+81621 10:43    03:06:08 nginx: worker process                                          
+81622 10:43    03:06:08 nginx: worker process                                          
+81623 10:43    03:06:08 nginx: worker process                                          
+81625 10:43    03:06:08 nginx: worker process                                          
+81626 10:43    03:06:08 nginx: worker process
+
+
+其中的STIME是启动日期，ELAPSED是持续运行时间，格式为“运行天数－时：分：秒”（dd-hh24:mi:ss）。
+
+yum -y install tmpwatch
+
+
+[root@DB-Server ~]# more /etc/cron.daily/tmpwatch 
+ 
+flags=-umc 
+ 
+/usr/sbin/tmpwatch "$flags" -x /tmp/.X11-unix -x /tmp/.XIM-unix \ 
+ 
+-x /tmp/.font-unix -x /tmp/.ICE-unix -x /tmp/.Test-unix \ 
+ 
+-X '/tmp/hsperfdata_*' 240 /tmp 
+ 
+/usr/sbin/tmpwatch "$flags" 720 /var/tmp 
+ 
+for d in /var/{cache/man,catman}/{cat?,X11R6/cat?,local/cat?}; do 
+ 
+if [ -d "$d" ]; then 
+ 
+/usr/sbin/tmpwatch "$flags" -f 720 "$d" 
+ 
+fi 
+ 
+done 
+ 
+[root@DB-Server ~]# 

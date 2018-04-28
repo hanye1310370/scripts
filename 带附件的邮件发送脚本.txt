@@ -1,0 +1,55 @@
+#!/usr/bin/python
+#coding:utf-8
+import smtplib #负责登录smtp服务器的
+from email.mime.text import MIMEText #用来定义邮件的
+from email import MIMEMultipart #定义发送邮件的根容器
+from email import MIMEBase #定义附件
+from email import Encoders #对附件进行编码
+msg= """
+    linux基础
+    链接：http://pan.baidu.com/s/1mhBDhnM
+"""
+#接收人字符串
+to_str = """
+,
+1549214808@qq.com,
+"""
+###以上邮箱为了隐私写的是假的 
+#接收人列表
+to_list = to_str.replace("\n","").split(",")
+from_user = "root@localhost"#发送人
+title = "san 的 Linux福利" #邮件的标题
+#实例化一个邮件根容器
+message = MIMEMultipart.MIMEMultipart()
+#定义文本项
+mail = MIMEText(msg,"plain","utf-8")
+    #发送的内容    #内容的类型    #内容的编码
+message.attach(mail)
+#附件的类型的变量
+mintype,subtype = "application","octet-stream"
+#定义附件的类型
+file_message = MIMEBase.MIMEBase(mintype,subtype)
+#附件添加内容
+with open("by.txt","rb") as f:
+    file_message.set_payload(f.read())
+#对附件进行编码
+Encoders.encode_base64(file_message)
+#附件的头部定义
+file_message.add_header(
+    "Content-Disposition",
+    "attachment",
+    filename = "by.txt"
+)
+message.attach(file_message)
+message["Subject"] = title
+message["From"] = from_user
+message["To"] = to_str
+#登录smtp服务器    #qq smtp 服务器地:localhost    #smtp 服务器地址端口： 25
+smtp_server = "localhost"
+smtp_port = 25
+#server = smtplib.SMTP_SSL(smtp_server,smtp_port)
+server = smtplib.SMTP(smtp_server,smtp_port)
+#server.login(from_user,"") #如果是smtp ssl 加密的需要用户名密码登录
+server.sendmail(from_user,to_list,message.as_string())
+    #发送人 #接收人列表  #发送的内容
+server.quit()

@@ -1,0 +1,34 @@
+Sequence 隐式用法
+更新时间：2017-08-07 15:19:13   分享：   
+在为主键定义 AUTO_INCREMENT 后，Sequence 可以用于自动填充主键，由 DRDS 自动维护。
+
+CREATE TABLE
+
+扩展标准建表语法，增加了自增列的 Sequence 类型，如果未指定类型关键字，则默认类型为 GROUP。DRDS 自动创建的跟表相关联的 Sequence 名称，都是以 AUTO_SEQ_ 为前缀，后面加上表名。
+
+CREATE TABLE <name> (
+   <column> ... AUTO_INCREMENT [ BY GROUP | SIMPLE | TIME ],
+   <column definition>,
+   ...
+) ... AUTO_INCREMENT=<start value>
+SHOW CREATE TABLE
+
+当表为拆分表或者广播表时，显示自增列 Sequence 的类型。
+
+SHOW CREATE TABLE <name>
+示例：
+
+建表时指定 AUTO_INCREMENT，但是没有指定 Sequence 类型关键字，则默认使用 Group Sequence。
+
+group sequence
+
+建表时指定 AUTO_INCREMENT，同时指定使用 Time-based Sequence 作为主键值。
+
+time-bases sequence
+
+ALTER TABLE
+
+暂不支持通过 ALTER TABLE 来修改对应 Sequence 的类型，但可修改起始值。如果想要修改表中带的隐式 Sequence 的类型，需要通过 SHOW SEQUENCES 指令查找出 Sequence 的具体名称和类型，然后再用 ALTER SEQUENCE 指令去修改。
+
+ALTER TABLE <name> ... AUTO_INCREMENT=<start value>
+注意：使用 DRDS Sequence 后，请谨慎修改 AUTO_INCREMENT 的起始值（仔细评估已经产生的 Sequence 值，以及生成新 Sequence 值的速度，防止产生冲突）。

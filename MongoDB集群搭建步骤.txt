@@ -1,0 +1,43 @@
+搭建mongodb集群很多次，每次都会或多、或少出现一些见鬼的问题，写这篇文章供以后参考。本次是基于mongodb3.0进行集群的搭建；搭建步骤如下：
+
+1、设置操作系统的环境
+echo "never">"/sys/kernel/mm/transparent_hugepage/enabled" 
+echo "never">"/sys/kernel/mm/transparent_hugepage/defrag" 
+ulimit -n 64000
+
+2、配置文件的修改[mongod.conf]
+shards配置：port=27018、directoryperdb=true 、bind_ip=0.0.0.0 
+ config配置：port=27019、bind_ip=0.0.0.0 
+ monogs配置：mongos --configdb 192.168.12.150:27019 --logpath /var/log/mongodb/mongos.log  --pidfilepath /var/run/mongodb/mongos.pid --logappend --logRotate reopen --fo 
+ hosts配置：{shardone.mongodb.local,shardtwo.mongodb.local,shardthree.mongodb.local}添加上每台分片服务器对应的IP地址的域名解析
+
+3、添加分片
+>>mongo admin 
+>>db.runCommand({addshard:"shardone.mongodb.local:27018",name:"shardone"})          --添加分片 
+>>db.runCommand({addshard:"shardtwo.mongodb.local:27018",name:"shardtwo"}) 
+>>db.runCommand({addshard:"shardthree.mongodb.local:27018",name:"shardthree"})
+
+分片服务器尽量以域名解析的方式，避免以后服务器的ip地址变更
+
+4、对数据库启动分片和添加片键
+>>db.runCommand({"enablesharding":"mc_visit"}) 
+>>db.runCommand({"shardcollection":"mc_visit.mc_visit","key":{"visitdate":-1,"virus":1}})
+
+5、没有数据情况下修改片键
+>>use config 
+>>db.collections.find() --查看所有的片键 
+>>db.chunks.find()      --查看已有分片的块
+
+
+kill -3 `ps -ef|grep mongod|grep -v grep|awk '{print $2}'`
+
+
+MongoDb的“not master and slaveok=false”错误及解决方法
+在SECONDARY查询出发现如下错误：
+
+SECONDARY> show collections;
+Sat Aug  4 15:29:00 uncaught exception: error: { "$err" : "not master and slaveok=false", "code" : 13435 }
+
+这是正常的，因为SECONDARY是不允许读写的，如果非要解决，方法如下：
+
+SECONDARY> rs.slaveOk();

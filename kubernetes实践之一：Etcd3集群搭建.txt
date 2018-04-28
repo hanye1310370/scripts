@@ -1,0 +1,136 @@
+# 一：Etcd简介 #
+    ETCD是用于共享配置和服务发现的分布式，一致性的KV存储系统。类似于Zookeeper.
+    ETCD的使用场景:配置管理,服务注册于发现,选主,应用调度,分布式队列,分布式锁.
+    ETCD使用Raft协议来维护集群内各个节点状态的一致性。简单说，ETCD集群是一个分布式系统，由多个节点相互通信构成整体对外服务，每个节点都存储了完整的数据，并且通过Raft协议保证每个节点维护的数据是一致的。
+
+二：Etcd3集群背景
+
+10.116.137.196    k8s_master
+10.116.82.28       k8s_node1
+10.116.36.57       k8s_node2
+
+Etcd版本：etcd-v3.1.8-linux-amd64.tar.gz（https://github.com/coreos/etcd/releases）
+
+三：Etcd3安装
+
+1.环境变量设置  vi /etc/profile
+
+export ETCDCTL_API=3
+
+2.关闭系统防火墙
+
+systemctl disable firewalld
+systemctl stop firewalld
+
+3.安装
+
+tar -zxvf etcd-v3.1.8-linux-amd64.tar.gz
+cp etcd /usr/bin/
+cp etcdctl /usr/bin/
+
+创建/etc/etcd/etcd.conf 配置文件
+创建/usr/lib/systemd/system/etcd.service   systemctl启动文件。
+
+4.配置文件（蓝色背景处为三个节点需要修改的地方）
+
+etcd.service
+
+
+点击(此处)折叠或打开
+[Unit]
+Description=Etcd Server
+After=network.target
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+WorkingDirectory=/var/lib/etcd/
+EnvironmentFile=/etc/etcd/etcd.conf
+ExecStart=/bin/bash -c "GOMAXPROCS=$(nproc) /usr/bin/etcd --name=\"${ETCD_NAME}\" --data-dir=\"${ETCD_DATA_DIR}\" --listen-client-urls=\"${ETCD_LISTEN_CLIENT_URLS}\" --listen-peer-urls=\"${ETCD_LISTEN_PEER_URLS}\" --advertise-client-urls=\"${ETCD_ADVERTISE_CLIENT_URLS}\" --initial-advertise-peer-urls=\"${ETCD_INITIAL_ADVERTISE_PEER_URLS}\" --initial-cluster=\"${ETCD_INITIAL_CLUSTER}\" --initial-cluster-state=\"${ETCD_INITIAL_CLUSTER_STATE}\""
+Restart=on-failure
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+etcd.conf 配置文件（https://github.com/coreos/etcd/blob/master/etcd.conf.yml.sample）
+
+
+点击(此处)折叠或打开
+# [member]
+ETCD_NAME=k8s_master
+ETCD_DATA_DIR="/var/lib/etcd/default.etcd"
+ETCD_LISTEN_PEER_URLS="http://120.25.154.90:2380"
+ETCD_LISTEN_CLIENT_URLS="http://120.25.154.90:2379,http://127.0.0.1:2379"
+
+# [cluster]
+ETCD_INITIAL_ADVERTISE_PEER_URLS="http://120.25.154.90:2380"
+ETCD_INITIAL_CLUSTER="k8s_master=http://120.25.154.90:2380,k8s_node1=http://120.25.220.176:2380,k8s_node2=http://112.74.105.178:2380"
+ETCD_INITIAL_CLUSTER_STATE="new"
+ETCD_INITIAL_CLUSTER_TOKEN="k8s-etcd-cluster"
+ETCD_ADVERTISE_CLIENT_URLS="http://120.25.154.90:2379"
+5.启动 通过systemctl start命令启动etcd服务，同时使用systemctl enable 命令将服务加入开机启动列表中
+
+systemctl     daemon-reload
+systemctl     enable    etcd.service
+systemctl     start       etcd.service
+
+6.启动结果查询
+
+
+
+四：Etcd配置参数说明（https://coreos.com/etcd/docs/latest/op-guide/configuration.html）
+
+
+点击(此处)折叠或打开
+Etcd的参数配置方式有两种，一种是命令行的方式，一种是环境变量的方式。命令行方式的优先级高于环境变量的方式。
+
+Etcd默认2379端口处理客户端的请求；2380端口用于集群各成员间的通信。
+
+#[member]
+
+-name 或 ETCD_NAME:
+
+指定当前etcd成员的名称 默认值为"default",通常用户Hostname来命名。
+
+-data-dir或ETCD_DATA_DIR：
+
+etcd数据文件目录，默认是“${name}.etcd”
+
+–snapshot-count或ETCD_SNAPSHOT_COUNT：
+
+指定多少次commit操作会触发一次磁盘快照，默认值是10000
+
+–heartbeat-interval或 ETCD_ELECTION_TIMEOUT：
+
+心跳信号间隔，毫秒级，默认是100毫秒。
+
+–listen-peer-urls或 ETCD_LISTEN_PEER_URLS
+
+用于监听集群中其他成员的发送信息的地址。默认值是“http://localhost:2380”
+
+–listen-client-urls或ETCD_LISTEN_CLIENT_URLS：
+用于监听客户端发来的信息的地址，默认值是“http://localhost:2379”
+
+–max-snapshots或ETCD_MAX_SNAPSHOTS
+镜像文件的最大个数，默认是5.0表示无限制
+
+–max-wals或ETCD_MAX_WALS：
+
+#[cluster]
+–initial-advertise-peer-urls或 ETCD_INITIAL_ADVERTISE_PEER_URLS：
+集群中各节点相互通信的地址。
+
+–initial-cluster或ETCD_INITIAL_CLUSTER：
+初始集群由哪些成员组成 默认值是“efault=http://localhost:2380”
+
+–initial-cluster-state或ETCD_INITIAL_CLUSTER_STATE：
+集群的初始状态，其值有“new”和“existing”,默认为“new”
+
+–initial-cluster-token:ETCD_INITIAL_CLUSTER_TOKEN:
+
+集群名称
+
+–advertise-client-urls或ETCD_ADVERTISE_CLIENT_URLS：
+
+客户端与集群通信地址

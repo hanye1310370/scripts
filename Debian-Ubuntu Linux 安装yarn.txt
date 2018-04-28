@@ -1,0 +1,56 @@
+Debian/Ubuntu Linux
+
+在 Debian 或 Ubuntu Linux 上，你可以通过我们的 Debian 包仓库安装 Yarn。您首先需要配置该仓库：
+
+curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+在 Ununtu 14.04 和 Debian 稳定版上，你也需要配置 NodeSource 仓库来获得足够新的 Node.js 版本（Debian 测试版和 Ubuntu 16.04 打包了够用的 Node.js 版本，所以在这些环境下不需要这一步）
+
+然后你可以简单的：
+
+sudo apt-get update && sudo apt-get install yarn
+注意：Ubuntu 17.04 默认预装有 cmdtest。 如果您在安装 yarn 时遇到错误，您可能需要先运行 sudo apt remove cmdtest。 查阅这里了解更多信息。
+
+CentOS / Fedora / RHEL
+
+在 CentOS、Fedora、RHEL 上，你可以通过 RPM 包仓库安装 Yarn。
+
+sudo wget https://dl.yarnpkg.com/rpm/yarn.repo -O /etc/yum.repos.d/yarn.repo
+如果你没有安装 Node.js，你也应该配置 NodeSource 仓库：
+
+curl --silent --location https://rpm.nodesource.com/setup_6.x | sudo bash -
+然后你可以简单的：
+
+sudo yum install yarn
+## 或 ##
+sudo dnf install yarn
+Arch Linux
+
+在 Arch Linux 上，Yarn 可以通过官方的包管理器来安装。
+
+pacman -S yarn
+Solus
+
+在 Solus 上，你可以通过 Solus 仓库安装 yarn。
+
+sudo eopkg install yarn
+Alpine
+
+在 Alpine Linux (3.6+) 上，你可以用 apk 安装 yarn。
+
+apk add yarn
+路径设置
+
+如果您选择手动安装，用以下步骤添加 Yarn 到 path 变量，使其可以随处运行。
+
+注意：您的配置文件可能是您的 .profile、.bash_profile、.bashrc、.zshrc 等。
+
+将此项加入您的配置文件: export PATH="$PATH:/opt/yarn-[version]/bin" （路径可能根据您安装 Yarn 的位置而有差异）
+在终端中，登录并登出以使更改生效
+为全局访问 Yarn 的可执行文件，您需要在您的终端中设置 PATH 环境变量。 若要执行此操作，请添加 export PATH="$PATH:`yarn global bin`" 到您的配置文件。
+运行命令来测试 Yarn 是否安装：
+
+yarn --version
+每夜构建
+
+每夜构建是 Yarn 最新和最大的版本，使用最新的 Yarn 代码构建。每夜构建对于尝试还没有作为稳定版发布的新功能或测试 bug 修复很有用。这些构建不保证稳定并且可能有 bugs。

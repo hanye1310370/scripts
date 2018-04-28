@@ -1,0 +1,430 @@
+mysql 密码恢复及设置
+
+[root@mysql ~]# grep password /var/log/mysqld.log#mysql 启动后随机生成的初始密码
+2017-12-20T02:36:18.623330Z 1 [Note] A temporary password is generated for root@localhost: 5h)>QAdqbI7t
+#使用初始密码登录 并重置密码   初始密码不能对数据库进行操作 需要重置密码
+[root@mysql4-1 ~]# mysql -hlocalhost -uroot -p'5h)>QAdqbI7t'
+修改密码验证策略
+mysql> set global validate_password_policy=0;
+#策略 0 长度
+1 （默认） 长度；数字，小写/大写，和特殊字符
+2 长度；数字，小写/大写，和特殊字符；字典文件
+修改密码长度6  默认值是8个字符
+
+mysql> set global validate_password_length=6;
+mysql> alter user root@"localhost" identified by "123456";
+mysql> show database;#测试
+mysql> quit
+Bye
+[root@mysql4-1 ~]# mysql -hlocalhost -uroot -p'123456'
+设置密码验证策略永久生效
+[root@mysql4-1 ~]# vim /etc/my.cnf
+...
+[mysqld]
+validate_password_policy=0
+validate_password_length=6
+...
+[root@mysql4-1 ~]# systemctl restart mysqld
+
+修改数据库管理员本机管理密码（操作系统管理员）
+mysqladmin -hlocalhost -uroot -p旧密码 password '新密码'
+[root@mysql ~]# mysqladmin -hlocalhost -uroot -p123456 password '123123'
+当忘记密码时,密码恢复
+[root@mysql ~]# vim /etc/my.cnf
+[mysqld]
+skip-grant-tables#启动时不验证用户密码
+[root@mysql ~]# systemctl restart mysqld
+[root@mysql ~]# mysql
+mysql> update mysql.user set authentication_string=password("abc123") where user="root";
+mysql> flush privileges; #刷新MySQL的系统权限相关表
+[root@mysql ~]# vim /etc/my.cnf
+关闭启动时不验证用户密码
+[root@mysql ~]# systemctl restart mysqld
+[root@mysql ~]# mysql -uroot -pabc123
+
+
+数据管理
+数据导入：把系统文件的内容存储到数据库的表里
+/etc/passwdstudb.user
+        用户名 密码占位符 UID GID  描述信息  家目录   shell
+        create database studb;
+        create table studb.user(
+        name char(50),
+        password char(1),
+        UID int(2),
+        GID int(2),
+        comment varchar(100),
+        homedir char(100),
+        shell char(25)
+        )engine=innodb; 
+        select * from studb.user;  
+        load data infile '目录/文件名' into table '库.表名' fields terminated by "字段间隔符号" lines terminated by "行间隔符号"
+        
+        查看默认使用目录及目录是否存在
+        mysql> show variables like "secure_file_priv";
+        +------------------------------+-------------------------------------------+
+        | Variable_name            | Value                                          |
+        +-------------------------------+-----------------------------------------+
+        | secure_file_priv           | /var/lib/mysql-files/                    |
+        +-------------------------------+------------------------------------------+
+        [root@mysql4-1 ~]# cp /etc/passwd /var/lib/mysql-files/
+        [root@mysql4-1 ~]# setenforce 0
+        mysql> load data infile '/var/lib/mysql-files/passwd' into table user fields terminated by ":" lines terminated by "\n";
+        Query OK, 44 rows affected (0.04 sec)
+        Records: 44  Deleted: 0  Skipped: 0  Warnings: 0
+        
+        修改默认使用目录
+        [root@mysql4-1 ~]# mkdir /myfile
+        [root@mysql4-1 ~]# chown mysql /myfile/
+        [root@mysql4-1 ~]# vim /etc/my.cnf
+        [mysqld]
+        secure_file_priv="/myfile"
+        [root@mysql4-1 ~]# systemctl restart mysqld
+        mysql> show variables like "secure_file_priv";
+        +-------------------------------+-------------------+
+        | Variable_name    | Value    |
+        +-------------------------------+------------------+
+        | secure_file_priv | /myfile/ |
+        +--------------------------------+-----------------+
+        1 row in set (0.00 sec)
+        
+
+数据导出：把表记录存储到系统
+        sql 查询 into outfile "目录/文件名";
+        sql 查询 into outfile "目录/文件名" fields terminated by "字段间隔符号" lines terminated by "行间隔符号"； 
+        mysql> select name,UID from user limit 5 into outfile "/myfile/user1.txt";
+        [root@mysql4-1 ~]# ls /myfile/
+        user1.txt
+        [root@mysql4-1 ~]# cat /myfile/user1.txt #默认字段间隔符号为<tab>  默认行间隔符号"\n"
+        root0
+        bin1
+        daemon2
+        adm3
+        lp4
+        
+        mysql> select name,UID from user limit 5 into outfile "/myfile/user2.txt" fields terminated by "#" lines terminated by ":";
+        [root@mysql4-1 ~]# ls /myfile/
+        user1.txt  user2.txt
+        [root@mysql4-1 ~]# cat /myfile/user2.txt 
+        root#0:bin#1:daemon#2:adm#3:lp#4:
+        
+
+用户授权 grant
+就是在数据库服务器添加新的连接用户
+grant 权限列表 on 库名 to 用户@"客户端地址" identified by '密码'  [ with grant option ];
+mysql> grant all on *.* to root@192.168.4.2 identified by '123456' with grant option;
+
+权限的表示方式： all(所以权限),  usage(没有权限),  select,update(name,age),delete
+库名的表示方式： 库名.表名 库名.*  *.*
+用户名 自定义
+客户端地址表示方式： 192.168.4.117(一台机器) 192.168.2.%（一个网段） 
+identified by '密码'  #登录密码
+with grant option #可以有授权权限  可选项
+
+客户端测试授权
+which mysql 
+mysql -h数据库服务器ip -u用户名 -p密码
+[root@localhost ~]# mysql -h192.168.4.1 -uroot -p123456
+
+select @@hostname;
+mysql> select @@hostname;
++---------------------+
+| @@hostname |
++---------------------+
+| mysql4-1           |
++---------------------+
+1 row in set (0.00 sec)
+
+select user();
+mysql> select user();
++--------------------------------+
+| user()                               |
++--------------------------------+
+| root@192.168.4.2         |
++--------------------------------+
+1 row in set (0.00 sec)
+
+
+show grants;
+mysql> show grants;
++-------------------------------------------------------------------------------------------------------------------------------+
+| Grants for root@192.168.4.2                                                                                                              |
++-------------------------------------------------------------------------------------------------------------------------------+
+| GRANT ALL PRIVILEGES ON *.* TO 'root'@'192.168.4.2' WITH GRANT OPTION               |
++-------------------------------------------------------------------------------------------------------------------------------+
+1 row in set (0.00 sec)
+
+允许从网站服务器上使bbsuser用户连接 密码时123456 只对bbsdb小的所以表有完全权限
+mysql> grant all on bbsdb.* to bbsuser@192.168.4.3 identified by '123456';
+
+MySQL [(none)]> show grants;
++---------------------------------------------------------------------------------------------------------------+
+| Grants for bbsuser@192.168.4.3                                                                                  |
++---------------------------------------------------------------------------------------------------------------+
+| GRANT USAGE ON *.* TO 'bbsuser'@'192.168.4.3'                                                 |
+| GRANT ALL PRIVILEGES ON `bbsdb`.* TO 'bbsuser'@'192.168.4.3'                   |
++---------------------------------------------------------------------------------------------------------------+
+2 rows in set (0.00 sec)
+
+MySQL [(none)]> create database bbsdb;
+Query OK, 1 row affected (0.00 sec)
+
+运行admin用户在数据库服务器本机登录 密码123456 只有查询记录权限
+mysql> grant select on *.* to admin@localhost identified by '123456';
+
+授权信息存储子授权库mysql下的表里
+mysql> use mysql;
+mysql> show tables;
+user 已有的授权用户信息
+db授权用户对库的访问权限
+tables_priv授权用户对表的访问权限
+columns_priv 授权用户对表中字段的访问权限
+
+查看服务器上有哪些授权用户
+mysql> select user,host from mysql.user;
++-------------------+-----------------------+
+| user                 | host                      |
++-------------------+-----------------------+
+| root                  | 192.168.4.2        |
+| bbsuser          | 192.168.4.3         |
+| admin              | localhost             |
+| mysql.sys       | localhost              |
+| root                  | localhost              |
++-------------------+-----------------------+
+5 rows in set (0.00 sec)
+
+mysql> show grants for bbsuser@192.168.4.3;
++---------------------------------------------------------------------------------------------------------------+
+| Grants for bbsuser@192.168.4.3                                                                                  |
++---------------------------------------------------------------------------------------------------------------+
+| GRANT USAGE ON *.* TO 'bbsuser'@'192.168.4.3'                                                |
+| GRANT ALL PRIVILEGES ON `bbsdb`.* TO 'bbsuser'@'192.168.4.3'                  |
++---------------------------------------------------------------------------------------------------------------+
+2 rows in set (0.00 sec)
+
+查看以有的授权用户对服务器上库的权限
+mysql> select user,host,db from mysql.db;
++-------------------+-----------------------+------------+
+| user                 | host                     | db           |
++-------------------+-----------------------+------------+
+| bbsuser          | 192.168.4.3        | bbsdb     |
+| mysql.sys       | localhost             | sys          |
++-------------------+-----------------------+------------+
+2 rows in set (0.01 sec)
+
+查看以有的授权用户对服务器上库中的表的权限
+mysql> select host,user,db,table_name from mysql.tables_priv;
++-------------------+-------------------+----------+---------------------+
+ | host                 | user               | db         | table_name    |
++-------------------+-------------------+----------+--------------------+
+ | localhost        | mysql.sys       | sys       | sys_config     |
++-------------------+--------------------+----------+-------------------+
+
+授权用户登录服务器后，修改登录密码
+set password=password("123456");
+
+管理员重置授权用户登录密码
+set password for 用户名@客户端地址 
+mysql> set password for bbsuser@192.168.4.3=password('abc123');
+
+权限撤销 revokel
+revokel 权限列表 on 库名 for 用户名@'客户端地址'；
+删除授权用户
+drop user 用户名@"客户端地址"
+
+查看授权用户权限
+show grants for 用户名@"客户端地址"
+mysql> show grants for root@192.168.4.2;
+
+撤销root用户在192.168.4.2主机登录的授权权限
+mysql> revoke grant option on *.* from root@192.168.4.2
+
+撤销root用户在192.168.4.2主机登录的删除记录和修改记录的权限
+mysql> revoke update,delete on *.* from roo
+
+撤销root用户剩于所以的权限
+mysql> revoke all  on *.* from root@192.168.4.2;
+
+也可以通过修改表记录的方式撤销用户的权限
+mysql> select * from mysql.db where db='bbsdb' and user='bbsuser' and host='192.168.4.3'\G;
+修改在对应表中的记录信息
+mysql> update  mysql.db set delete_priv="N",Drop_priv="N" where db='bbsdb' and user='bbsuser' and host='192.168.4.3';
+mysql> flush privileges;
+
+mysql 优化：
+数据库服务器响应客户请求特别慢，可能是由于那些原因造成的，如何排除，请说出你的处理思路
+
+1.网络带宽窄  测速软件 花钱买带宽
+
+2.硬件配置低
+            CPU	                内存	         硬盘                            使用率
+	    核数	                容量大	         转速 15000/秒	
+        	cpu 使用率
+        	[root@mysql12 ~]# uptime
+        	 20:18:23 up 6 min,  1 user,  load average: 0.08, 0.13, 0.09
+        			  					负载
+        	内存 使用率
+        	[root@mysql12 ~]# free -m
+        		      total        used        free      shared  buff/cache   available
+        	Mem:            993         282         463           6         246         556
+        	Swap:          2047           0        2047
+        
+        	磁盘 使用率
+        	[root@mysql12 ~]# top
+        	top - 20:20:52 up 8 min,  1 user,  load average: 0.01, 0.08, 0.07
+        	Tasks: 117 total,   2 running, 115 sleeping,   0 stopped,   0 zombie
+        	%Cpu(s):  0.3 us,  0.0 sy,  0.0 ni, 99.7 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+        	KiB Mem :  1016916 total,   435968 free,   327600 used,   253348 buff/cache
+        	KiB Swap:  2097148 total,  2097148 free,        0 used.   531780 avail Mem 
+        
+        	wa 百分比越大 等待写入或读取磁盘的越多
+        
+3. 提供服务的软件版本低导致	升级服务软件版本
+
+                查看服务运行时，参数的值
+                查看参数值
+                mysql> show variables like "%关键字%"
+                修改参数值
+                	命令行修改
+                	set 变量名=值
+                	set global 变量名=值	#全局
+                	永久修改
+                	vim /etc/my.cnf
+                	变量名=值
+                	：wq
+                	systemclt restart mysqld
+                
+                	并发连接数
+                mysql> show variables like "%connect%";
+                +------------------------------------------------------------------------------------+------------------------------+
+                | Variable_name                                                                               | Value                            |
+                +------------------------------------------------------------------------------------+------------------------------+
+                | character_set_connection                                                             | utf8                                |
+                | collation_connection                                                                      | utf8_general_ci           |
+                | connect_timeout                                                                             | 10                                  |
+                | disconnect_on_expired_password                                             | ON                                 |
+                | init_connect                                                                                     |                                       |
+                | max_connect_errors                                                                      | 100                                |
+                | max_connections                                                                           | 151                               |
+                | max_user_connections                                                                 | 0                                    |
+                | performance_schema_session_connect_attrs_size                | 512                                |
+                +------------------------------------------------------------------------------------+------------------------------+
+                mysql> show variables like "%max_connections%";
+                +------------------------------+------------+
+                | Variable_name           | Value     |
+                +------------------------------+------------+
+                | max_connections       | 151         |		#并发连接数最大151
+                +------------------------------+------------+
+                1 row in set (0.01 sec)
+                
+                mysql> set GLOBAL max_connections=300;
+                Query OK, 0 rows affected (0.00 sec)
+                
+                mysql> show variables like "%max_connections%";
+                +------------------------------+------------+
+                | Variable_name            | Value     |
+                +------------------------------+------------+
+                | max_connections       | 300        |
+                +------------------------------+------------+
+                最大连接数/并发连接数 约等于 0.85
+                mysql> show global status like "Max_used_connections";
+                +---------------------------------------+------------+
+                | Variable_name                       | Value     |
+                 +---------------------------------------+------------+
+                | Max_used_connections        | 1             |
+                +---------------------------------------+------------+
+                
+                mysql> show processlist;			#查看当前正在连接的
+                +------+-----------------------+-------------------+-----------+---------------+-----------+---------------------------------------------------------------------------------------------------+---------------------------------+
+                | Id     | User                     | Host               | db          | Command | Time      | State                                                                                                                 | Info                                    |
+                +------+-----------------------+-------------------+-----------+---------------+-----------+---------------------------------------------------------------------------------------------------+---------------------------------+
+                |  1     | system user        |                         | NULL    | Connect   | 1961      | Connecting to master                                                                                      | NULL                                |
+                |  2     | system user        |                         | NULL    | Connect   | 1961      | Slave has read all relay log; waiting for more updates                              | NULL                                |
+                |  5     | root                       | localhost        | NULL   | Query        |    0          | starting                                                                                                              | show processlist             |
+                +------+-----------------------+-------------------+-----------+---------------+-----------+---------------------------------------------------------------------------------------------------+---------------------------------+
+                
+                	超时时间
+                mysql> show variables like "%timeout%";
+                 connect_timeout 		tcp三次握手的超时时间      超时时间太长  线程继续  pid号不能收回 内存被占用    超时时间太短 服务端会重复生成多个线程响应一次请求
+                 wait_timeout		连接建立后等待命令执行的超时时间(等待关闭连接的不活动超时时间)	 
+                
+                	重复使用的线程的数量
+                mysql> show variables like "%size%";
+                 thread_cache_size 	可以重复使用保存在缓存中线程数
+                	多个线程同时打开表的数量
+                mysql> show variables like "%cache%";
+                 table_open_cache 所有线程同时打开表的数量  
+                	查询缓存设置
+                mysql> show variables like "query_cache%";
+                 query_cache_type = 0|1|2
+                0	不允许存放
+                1	只要查询结果不超过限制都可以存放到查询缓存里
+                2	明确指定要把查询结果存放到缓存里，才存
+                
+                mysql> show global status like "qcache%";
+                Qcache_inserts	在查询缓存中查找一次 就自加一	
+                Qcache_hits		在查询缓存中查找到一次 就自加一
+                
+                
+4. 程序员编写的访问数据的查询语句复杂，导致处理速度慢
+                启用慢查询日志文件，记录超过指定时间显示查询结果得命令
+                mysql 支持四种日志文件：
+                binlog 日志 
+                错误日志log-error=/var/log/mysqld.log		#默认启用
+                查询日志	记录所有的sql操作
+                选项
+                general-log
+                general-log-file=文件名   #自定义日志文件
+                
+                #vim /etc/my.cnf
+                [mysqld]
+                general-log
+                ：wq
+                #systemctl restart mysqld
+                [root@mysql12 ~]# ls /var/lib/mysql
+                mysql12.log
+                
+                [root@mysql12 ~]# mysql -uroot -p123456
+                mysql> show databases;
+                
+                [root@mysql12 mysql]# tail -f mysql12.log 
+                /usr/sbin/mysqld, Version: 5.7.17-log (MySQL Community Server (GPL)). started with:
+                Tcp port: 0  Unix socket: /var/lib/mysql/mysql.sock
+                Time                 Id Command    Argument
+                2018-01-02T03:29:48.534719Z	    3 Query	SELECT TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE CREATE_OPTIONS LIKE '%partitioned%';
+                2018-01-02T03:30:55.132492Z	    5 Connect	root@localhost on  using Socket
+                2018-01-02T03:30:55.132850Z	    5 Query	select @@version_comment limit 1
+                2018-01-02T03:31:15.772203Z	    5 Query	show databases
+                2018-01-02T03:31:59.756227Z	    5 Quit	
+                
+                
+                慢查询日志
+                选项 
+                slow-query-log	 启用慢查询日志
+                slow-query-log-file=文件名		#自定义日志文件
+                long-query-time 		超过指定秒数（默认10秒）才被记录
+                long-queries-not-using-indexes		记录未使用索引的查询
+                
+                
+                
+                #vim /etc/my.cnf
+                [mysqld]
+                slow-query-log
+                ：wq
+                #systemctl restart mysqld
+                [root@mysql12 ~]# ls /var/lib/mysql
+                 mysql12-slow.log
+                
+                mysql> select sleep(10);
+                [root@mysql12 mysql]# cat mysql12-slow.log 
+                /usr/sbin/mysqld, Version: 5.7.17-log (MySQL Community Server (GPL)). started with:
+                Tcp port: 0  Unix socket: /var/lib/mysql/mysql.sock
+                Time                 Id Command    Argument
+                # Time: 2018-01-02T03:27:33.280720Z
+                # User@Host: root[root] @ localhost []  Id:     6
+                # Query_time: 10.000291  Lock_time: 0.000000 Rows_sent: 1  Rows_examined: 0
+                SET timestamp=1514863653;
+                select sleep(10);
+                
+
+5. 网络拓扑结构不合理，有数据传输瓶颈

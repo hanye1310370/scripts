@@ -1,0 +1,66 @@
+如何高效扫描 DRDS 数据
+更新时间：2017-08-14 14:42:15   分享：   
+DRDS 支持高效的数据扫描方式，并支持在全表扫描时使用聚合函数进行统计汇总。
+
+常见的扫描场景如下：
+
+没有分库分表： DRDS 会把原 SQL 传递到后端 MySQL 执行。这种情况下 DRDS 支持任何聚合函数。
+
+非全表扫描：SQL 经过 DRDS 路由后，发送到单个 MySQL 库上执行。比如说拆分键在 WHERE 中是等于关系时，就会出现非全表扫描。此时同样可以支持任何聚合函数。
+
+全表扫描：目前支持的聚合函数有 COUNT、MAX、MIN、SUM。另外在全表扫描时同样支持 LIKE、ORDER BY 、LIMIT 以及 GROUP BY 语法。
+
+并行的全表扫描：如果需要从所有库导出数据，可以通过 SHOW 指令查看表拓扑结构，针对分表并行处理。详见下文。
+
+通过 HINT 来进行表遍历
+
+执行 SHOW TOPOLOGY FROM TABLE_NAME 指令获取表拓扑结构。
+
+mysql:> SHOW TOPOLOGY FROM DRDS_USERS;
++------+-------------------+--------------+
+| ID   | GROUP_NAME        | TABLE_NAME   |
++------+-------------------+--------------+
+|    0 | DRDS_00_RDS       | drds_users   |
+|    1 | DRDS_01_RDS       | drds_users   |
++------+-------------------+--------------+
+2 rows in set (0.06 sec)
+非分库分表的表默认存储在第0个分库。
+
+针对 TOPOLOGY 进行单表遍历。 　
+
+第0个分库运行当前 SQL
+/!TDDL:node='DRDS_00_RDS'*/ SELECT * FROM DRDS_USERS;
+
+第1个分库运行当前 SQL
+/!TDDL:node='DRDS_01_RDS'*/ SELECT * FROM DRDS_USERS;
+
+注意：推荐每次扫描前执行 SHOW TOPOLOGY FROM TABLE_NAME 获取最新的表拓扑结构。
+
+并行扫描
+
+DRDS 支持 mysqldump 指令导出数据。但如果想要更快地扫描数据，可以针对每个分表开启多个会话的方式并行加速扫描。
+
+mysql> SHOW TOPOLOGY FROM LJLTEST;
++------+----------------+------------+
+| ID   | GROUP_NAME     | TABLE_NAME |
++------+----------------+------------+
+|    0 | TDDL5_00_GROUP | ljltest_00 |
+|    1 | TDDL5_00_GROUP | ljltest_01 |
+|    2 | TDDL5_00_GROUP | ljltest_02 |
+|    3 | TDDL5_01_GROUP | ljltest_03 |
+|    4 | TDDL5_01_GROUP | ljltest_04 |
+|    5 | TDDL5_01_GROUP | ljltest_05 |
+|    6 | TDDL5_02_GROUP | ljltest_06 |
+|    7 | TDDL5_02_GROUP | ljltest_07 |
+|    8 | TDDL5_02_GROUP | ljltest_08 |
+|    9 | TDDL5_03_GROUP | ljltest_09 |
+|   10 | TDDL5_03_GROUP | ljltest_10 |
+|   11 | TDDL5_03_GROUP | ljltest_11 |
++------+----------------+------------+
+12 rows in set (0.06 sec)
+如上所示该表有四个分库，每个分库有三个分表。使用以下的 SQL 对 TDDL5_00_GROUP 库上的分表进行操作：
+
+/!TDDL:node='TDDL5_00_GROUP'*/ select * from ljltest_00;
+注意： HINT 中的 TDDL5_00_GROUP 与 SHOW TOPOLOGY 指令结果中的 GROUP_NAME 列相对应。另外 SQL 中的表名为分表名。
+
+此时可开启最多12个会话（分别对应12张分表）并行处理数据。

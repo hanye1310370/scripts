@@ -1,0 +1,117 @@
+mysql 数据库导入\导出(总结备忘)
+  数据库的基本导入\导出的命令 是 mysqldump 和 source 
+在linux下直接用命令行操作就可以 在windows下 一般情况下有两种方法一个也是用命令行 另一个是用phpmyadmin
+ 
+先来说说phpmyadmin 这个工具导出和导入很简单 而且导入时无需建库 直接还原成原来的数据库   用source  也可以还原 但他导入文件时有大小限制不能超过2M
+再来说说  mysqldump 和 source  用命令操作很快 但是想把导出的文件再导入时必须先建立一个数据库(这个库可以随便起名) 然后进入数据库后才能导入用phpmyadmin导入mysqldump 导出的文件也得需要这步
+ 
+下面是从前辈那copy来的命令具体使用方法
+ 
+     1.导出整个数据库
+　　mysqldump -u 用户名 -p 数据库名 > 导出的文件名
+　　mysqldump -u wcnc -p smgp_apps_wcnc > wcnc.sql
+　　2.导出一个表
+　　mysqldump -u 用户名 -p 数据库名 表名> 导出的文件名
+　　mysqldump -u wcnc -p smgp_apps_wcnc users> wcnc_users.sql
+　　3.导出一个数据库结构
+　　mysqldump -u wcnc -p -d --add-drop-table smgp_apps_wcnc >d:wcnc_db.sql
+　　-d 没有数据 --add-drop-table 在每个create语句之前增加一个drop table
+　　
+备忘: mysqldump在linux下可直接使用 在windows下有时需要进入mysql/bin中使用 因为有时用的是类似appserv的套装软件 这样的话命令就不能直接使用 因为这些命令没在环境变量的目录里 而且用mysqldump导出的备份 必须先建立数据库才能导入
+ 
+ 
+      4.导入数据库
+　　常用source 命令
+　　进入mysql数据库控制台，
+　　如mysql -u root -p
+　　mysql>use 数据库
+　　然后使用source命令，后面参数为脚本文件(如这里用到的.sql)
+　　mysql>source d:wcnc_db.sql
+ 
+
+linux下导入、导出mysql数据库命令
+一、导出数据库用mysqldump命令（注意mysql的安装路径，即此命令的路径）：
+1、导出数据和表结构：
+mysqldump -u用户名 -p密码 数据库名 > 数据库名.sql
+#/usr/local/mysql/bin/   mysqldump -uroot -p abc > abc.sql
+敲回车后会提示输入密码
+
+2、只导出表结构
+mysqldump -u用户名 -p密码 -d 数据库名 > 数据库名.sql
+#/usr/local/mysql/bin/   mysqldump -uroot -p -d abc > abc.sql
+
+注：/usr/local/mysql/bin/  --->  mysql的data目录
+
+
+二、导入数据库
+1、首先建空数据库
+mysql>create database abc;
+
+2、导入数据库
+方法一：
+（1）选择数据库
+mysql>use abc;
+（2）设置数据库编码
+mysql>set names utf8;
+（3）导入数据（注意sql文件的路径）
+mysql>source /home/abc/abc.sql;
+方法二：
+mysql -u用户名 -p密码 数据库名 < 数据库名.sql
+#mysql -uabc_f -p abc < abc.sql
+
+建议使用第二种方法导入。
+
+
+
+MySQL导入导出命令 
+1.导出整个数据库 
+　　mysqldump -u 用户名 -p 数据库名 > 导出的文件名 
+　　mysqldump -u wcnc -p smgp_apps_wcnc > wcnc.sql 
+2.导出一个表 
+　　mysqldump -u 用户名 -p 数据库名 表名> 导出的文件名 
+　　mysqldump -u wcnc -p smgp_apps_wcnc users> wcnc_users.sql 
+
+3.导出一个数据库结构 
+　　mysqldump -u wcnc -p -d --add-drop-table smgp_apps_wcnc >d:wcnc_db.sql 
+　　-d 没有数据 --add-drop-table 在每个create语句之前增加一个drop table 
+
+4.导入数据库 
+　　常用source 命令 
+　　进入mysql数据库控制台， 
+　　如mysql -u root -p 
+　　mysql>use 数据库 
+　　然后使用source命令，后面参数为脚本文件(如这里用到的.sql) 
+　　mysql>source d:wcnc_db.sql （注：如果写成source d:/wcnc_db.sql，就会报语法错误） 
+注意：使用导入数据库命令的数据库文件必须在mysql的bin目录下才可以
+
+ 8 mysqldump字符集设置
+ mysqldump -uusername -ppassword --default-character-set=gb2312 db1 table1 > tb1.sql
+ 
+ 
+
+方法二:mysqldumpslow命令7 导入某些数据表
+ 系统命令行
+ mysql -uusername -ppassword db1 < tb1tb2.sql
+ 或mysql命令行
+ mysql>
+ user db1;
+ source tb1tb2.sql;
+ 
+
+01	/path/mysqldumpslow -s c -t 10 /tmp/slow-log
+02	这会输出记录次数最多的10条SQL语句，其中：
+03	-s, 是表示按照何种方式排序，c、t、l、r分别是按照记录次数、时间、查询时间、返回的记录数来排序，ac、at、al、ar，表示相应的倒叙；
+04	-t, 是top n的意思，即为返回前面多少条的数据；
+05	-g, 后边可以写一个正则匹配模式，大小写不敏感的；
+06	比如
+07	/path/mysqldumpslow -s r -t 10 /tmp/slow-log
+08	得到返回记录集最多的10个查询。
+09	/path/mysqldumpslow -s t -t 10 -g “left join” /tmp/slow-log
+10	得到按照时间排序的前10条里面含有左连接的查询语句。
+最后总结一下节点监控的好处 
+1． 轻量级的监控，而且是实时的，还可以根据实际的情况来定制和修改 
+2． 设置了过滤程序，可以对那些一定要跑的语句进行过滤 
+3． 及时发现那些没有用索引，或者是不合法的查询，虽然这很耗时去处理那些慢语句，但这样可以避免数据库挂掉，还是值得的 
+4. 在数据库出现连接数过多的时候，程序会自动保存当前数据库的processlist，DBA进行原因查找的时候这可是利器
+5. 使用mysqlbinlog 来分析的时候，可以得到明确的数据库状态异常的时间段 
+有些人会建义我们来做mysql配置文件设置

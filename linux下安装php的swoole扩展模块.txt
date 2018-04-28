@@ -1,0 +1,62 @@
+ 
+
+
+应开发同事要求，需要安装php的扩展模块swoole。
+swoole是一种PHP高级Web开发框架，框架不是为了提升网站的性能，而是为了提升网站的开发效率，以最少的性能损耗，换取最大的开发效率。
+
+假设服务器上php服务版本为php5.6.26，安装目录为/Data/app/php5.6.26，扩展模块文件路径为/Data/app/php5.6.26/lib/php/extensions/no-debug-non-zts-20131226/
+安装php的扩展模块要注意以下几点：
+1）扩展模块的下载包要是最新版的，并且是稳定版的，低版本或bata版本的安装后，php可能加载不起来。
+2）当本地服务器上有多个php版本时，扩展模块在编译时一定要加上--with-php-config=/Data/app/php5.6.26/bin/php-config，否则会出现诸如PHP Warning: PHP Startup: swoole: Unable to initialize module...类的报错；
+3）扩展模块编译后的.so文件（make && make install后的安装信息里会显示）一定要确保在扩展文件目录/Data/app/php5.6.26/lib/php/extensions/no-debug-non-zts-20131226/下面。如果不在，就手动拷贝！
+4）最后别忘了重启php-fpm服务
+5）php -m就能列出php的所有加载后的扩展模块
+
+swoole扩展模块的安装有以下两种方式：
+第一种：编译安装（swoole官网下载：http://pecl.php.net/package/swoole）
+[root@dev ~]# cd /usr/local/src
+[root@dev src]# wget http://pecl.php.net/get/swoole-1.9.3.tgz
+[root@dev src]# tar -zvxf swoole-1.9.3.tgz
+[root@dev src]# cd swoole-1.9.3
+
+[root@dev swoole-1.9.3]# /Data/app/php5.6.26/bin/phpize 
+[root@dev swoole-1.9.3]# ./configure --with-php-config=/Data/app/php5.6.26/bin/php-config 
+[root@dev swoole-1.9.3]# make && make install
+...........
+...........
+more information, such as the ld(1) and ld.so(8) manual pages.
+----------------------------------------------------------------------
+
+Build complete.
+Don't forget to run 'make test'.
+
+Installing shared extensions: /Data/app/php5.6.26/lib/php/extensions/no-debug-non-zts-20131226/
+
+然后在php.ini里配置
+[root@dev swoole-1.9.3]# vim /Data/app/php5.6.26/etc/php.ini
+.....
+extension="/Data/app/php5.6.26/lib/php/extensions/no-debug-non-zts-20131226/swoole.so"
+
+重启php-fpm服务
+[root@dev swoole-1.9.3]# pkill -9 php-fpm
+[root@dev swoole-1.9.3]# /Data/app/php5.6.26/sbin/php-fpm
+
+最后查看php加载的扩展模块：
+[root@dev swoole-1.9.3]# /Data/app/php5.6.26/bin/php -m
+............
+swoole
+
+第二种安装方法（推荐这种方法）：
+除了第一种的手工下载编译swoole以外，还可以通过PHP官方提供的pecl命令，一键下载安装swoole
+[root@dev ~]# /Data/app/php5.6.26/bin/pecl install swoole
+................
+Build process completed successfully
+Installing '/Data/app/php5.6.26/lib/php/extensions/no-debug-non-zts-20131226/swoole.so'
+.........
+
+确保产生的swoole.so文件在/Data/app/php5.6.26/lib/php/extensions/no-debug-non-zts-20131226下面（不在的话，就手动拷贝）
+然后在php.ini文件里添加extension="/Data/app/php5.6.26/lib/php/extensions/no-debug-non-zts-20131226/swoole.so"
+然后重启php-fpm加载swoole扩展模块即可。
+使用/Data/app/php5.6.26/bin/php -m 命令查看加载的模块
+
+***************当你发现自己的才华撑不起野心时，就请安静下来学习吧***************

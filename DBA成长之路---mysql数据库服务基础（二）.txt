@@ -1,0 +1,358 @@
+管理表记录 
+
+增加
+insert into 库.表 values(字段值列表);
+insert into 库.表(字段值列表) values(字段值列表);
+insert into 库.表 values(字段值列表),(字段值列表);
+
+查询
+单表查询
+select 字段名列表 from 库.表 where 条件；
+
+条件匹配的表示方法
+数值比较
+        字段名 符号 值 符号：>  >=  <  <=  =  !=
+        字符比较
+        字段名 符号 "值"  符号： =  !=
+        范围内匹配
+        字段名 in (值列表)在...里
+        select id,name from user where name in ("apache","root","bob");
+        select id,name,uid from user where uid in (1,2,3,4);
+        字段名 not in(值类表)不在...里
+        select name from user where uid not in(0,1,2,3,4,5);
+        字段名 between 值  and 值 在...之间(数值类型)
+        select * from user where id between 10 and 15;
+        select name from user where uid between 1 and 10;
+        
+        匹配空  is null
+        字段名 is null
+        匹配非空  is not null
+        字段名  is not null
+        select id from user where name is null;
+
+空的定义
+        insert into user(name) values (""),("null"),(null);
+        select id,name from user where name="";
+        select id,name from user where name="null";
+        select id,name from user where name is null;
+        mysql> select id,name from user where id between 45 and 47;
+        +-------+----------+
+        | id      | name    |
+        +-------+----------+
+        |  45    |               |
+        | 46     | null       |
+        | 47     | NULL   |
+        +-------+-----------+
+        3 rows in set (0.00 sec)
+    
+        不显示重复值
+        distinct 字段名
+        select shell from user;
+        select distinct shell from user;
+        mysql> select distinct shell from user;
+        +----------------------------+
+        | shell                           |
+        +----------------------------+
+        | /bin/bash                   |
+        | /sbin/nologin             |
+        | /bin/sync                    |
+        | /sbin/shutdown         |
+        | /sbin/halt                    |
+        | /bin/false                    |
+        | NULL                          |
+        +----------------------------+
+        7 rows in set (0.00 sec)
+
+逻辑匹配： 有多个条件时
+        逻辑与  and  多个条件必须都成立
+        逻辑或or多个条件有一个成立即可
+        逻辑非  !取反
+        select id,name from user where name="zhangsan"and uid=500 and shell="/bin/bash";
+
+运算操作  +  -  *  /  %
+        字段名 符号  字段名
+        select uid+gid as heid from user where name='root';
+        select uid+gid  heid from user where name='root';
+
+模糊查询
+        where 字段名 like '表达式'
+        _匹配任意一个字符 % 0个或多个字符
+        select name from user where name like '____' and uid <= 10;
+        select name from user where name like '%a%';
+        
+正则匹配
+        where 字段名 regexp '正则表达式';
+        . ^  $   [ ]  *
+        mysql> select name,uid from user where uid regexp '^..$';
+         
+函数
+        简单筛选/统计
+        avg() 集合平均值
+        sum()对集合的各参数求和
+        min() 集合中的最小值
+        max() 集合中的最大值
+        count() 记录的各数
+        
+查询排序 
+        sql查询 order by 字段名 asc/desc(降序)
+        select name,uid from user where uid between 10 and 50 order by uid ;
+
+查询分组 
+        sql查询 group by 字段名
+        select shell from user where uid between 10 and 50 group by shell;
+        和不显示重复相似
+
+查询限制显示行数 limit
+        select shell from user where uid between 10 and 50 limit 1;
+        select * from user limit 1;#显示查询的前一行
+        select * from user limit 2,3;#设置显示行范围  从第2行显示（行数开始为0行） 显示3行
+
+多表查询
+        select 字段名列表 from 表名列表；笛卡尔集
+        select 字段名列表 from 表名列表 where 条件；
+        create table studb.t1 select name,uid,shell from user limit 3;
+        create table studb.t2 select name,uid,homedir from user limit 4;
+        select t1.*,t2.homedir from t1,t2 where t1.uid =t2.uid;
+
+嵌套查询
+        where 嵌套查询：把内层的查询结果做为外层查询的查询条件
+        select 字段名列表 from 表名 where 条件 (select 字段名列表 from 表名 where 条件)
+        select name,uid from user where uid > (select avg(uid) from user);
+        select name from user where name in (select user from mysql.user);
+
+复制表：作用：快速建表，备份表
+        create table 库.表 sql查询；
+        复制表
+        create database dbbak;
+        create table dbbak.user2 select * from user;
+        复制表没有源表的属性和键值
+
+复制表结构
+        create table dbbak.user3 select * from user where 1=2;
+连接查询
+        左连接查询
+        select 字段列表 from  表A left join 表B on 条件
+        右连接查询
+        select 字段列表 from  表A right join 表B on 条件
+        create table studb.t3 select name,uid,shell from user limit 3;
+        create table studb.t4 select name,uid,shell from user limit 5;
+        mysql> select * from t3 left join t4 on t3.uid=t4.uid;#以左为主 显示
+        mysql> select * from t3 right join t4 on t3.uid=t4.uid; #以右为主 显示
+        
+修改
+    批量修改
+        update 库.表 set 字段名=值，字段名='值'
+        mysql> update user set age="18";
+        修改指定记录字段的值
+        update 库.表 set 字段名=值，字段名='值' where 条件
+        mysql> update user set name="zhangsan" where id=48;
+        
+删除
+        以行为删除单位
+        delete from 库.表 where 条件；
+        mysql> delete from user where shell is NULL;
+        
+
+mysql 键值（限制如何给字段赋值）
+普通索引 index
+        什么是索引 : 类似“一个书的目录” 树型目录结构
+        索引的优点 : 加快查询的速度
+        索引的缺点 : 减慢写的速度 （insert update delete）;占用物理存储空间
+        
+
+使用普通索引  索引index
+        索引的使用规则
+        默认可以重复，可以赋NULL值
+        可以由多个index字段
+        把查询条件做为索引
+        查看decs 表名；
+        show index from 表名；
+        标志 MUL
+        创建
+        建表时创建索引：
+        mysql> create table t25(
+            -> name char(10),
+            -> age int,
+            -> sex enum("boy","girl"),
+            -> index(sex)#索引名 默认和字段名相同
+            -> index(name)
+            -> );
+        在已有表创建索引 create index 索引名 on 表名（被赋索引的字段名）
+        mysql> create index age on t21(age);
+        mysql> show index from t21\G;
+        Table: t21
+           Non_unique: 1
+             Key_name: age
+         Seq_in_index: 1
+          Column_name: age
+            Collation: A
+          Cardinality: 4
+             Sub_part: NULL
+               Packed: NULL
+         Null: YES
+           Index_type: BTREE
+              Comment: 
+        Index_comment: 
+        
+        默认使用的索引类型（Index_type）：BTREE（二叉树）
+        还支持 hash B+TREE
+        
+        删除 drop index 索引名 on 表名；
+        mysql> drop index a1 on t21;
+
+fulltext 全文索引
+
+unique 唯一索引
+一个表中有多个unique字段
+可以为空 但是有值不能重复
+mysql> create table t211( stu_id char(9), name char(10), sex enum('boy','girl'), unique(stu_id) );
+mysql> desc t211;
+key标识是UNI 
+mysql> alter table t211 modify stu_id char(9) not null;
+mysql> desc t211;
+key标志是PRI 但是不是主键
+mysql> drop index stu_id on t211;
+创建 unique index
+mysql> create unique index stu on t211(stu_id);
+
+
+主键
+        主键使用规则
+        一个表中只能有一个primary key
+        不允许重复 不能为空
+        查看 decs 表名；
+        标志 PRI
+        创建 建表时创建主键：
+        mysql> create table t26(
+            -> name char(10),
+            -> age int,
+            -> likes set("a","b","c"),
+            -> primary key(name)
+            -> );
+        mysql> create table t22(
+            -> id int primary key,
+            -> name char(10)
+            -> );
+        在已有表创建主键：
+        mysql> alter table t25 add primary key(name);
+        删除 alter table 表名 drop primary key;
+        mysql> alter table t25 drop primary key;
+        
+        复合主键 多个字段一起做主键 字段的值不允许同时重复
+        查看
+        mysql> desc t28;
+        建表时创建主键：
+        mysql> create table t28(
+            -> cip char(15),
+            -> port smallint,
+            -> status enum("allow","deny") defualt "deny",
+            -> primary key(cip,port)
+            -> );
+        在已有表创建主键：
+        mysql> alter table t28 add primary key (cip,port);
+        删除
+        mysql> alter table t28 drop primary key;
+        主键一般 与auto_increment 连用
+            字段值自动增长
+        满足条件 主键 数值类型
+        创建表
+        mysql> create table t27(
+            -> id int(2) zerofill primary key auto_increment,
+            -> name char(10),
+            -> class char(4),
+            -> index (name)
+            -> );
+        删除自动增长的主键
+        mysql> alter table t27 modify id int(2) unsigned zerofill not null;
+        mysql> alter table t27 drop primary key;
+    
+外键 
+        作用：限制给字段赋值的。值必须在指定表中指定字段值的范围里选择
+        表的存储引擎必须是 innodb
+        字段类型要一致
+        被参照字段必须要是索引类型的一种
+        创建命令
+        foreign key(字段名) references 表名(字段名) 
+        on update cascade同步更新
+        on delete cascade同步删除
+
+        update 表名 set 字段名=值  where 条件;
+        delete from 表名 where 条件
+        删除外键
+        mysql> show create table xsb;#查看建表命令
+        可以查看外键名
+        alter table 表名 drop foreign key 外键名
+        
+        在已经创建的表上添加外键
+        alter table 表名 add foreign key(字段名) references 表名(字段名) 
+        on update cascade同步更新
+        on delete cascade同步删除
+
+mysql 服务的体系结构：（8个功能模块）
+        连接池：检查是否可以连接mysql
+       sql接口： 执行的命令 传递给mysqld
+        分析器：分析语法错误
+        优化器：优化执行命令
+        查询缓存：数据库的物理内存划分出的 每次查询 先找查询缓存
+        存储引擎：
+        文件系统：
+      管理工具：安装mysql给提供的一些软件工具
+        
+mysql存储引擎:
+
+存储引擎介绍
+        mysql 数据库服务软件自带的程序。
+        不同的存储引擎有不同的功能和数据存储方式
+        查看数据库服务支持的存储引擎
+        mysql> show engines;
+        | InnoDB             | DEFAULT |#default 默认存储引擎
+        | MyISAM             | YES     |
+常用的存储引擎
+    myisam
+        表.frm 表结构
+        表.MYI索引信息
+        表.MYD数据
+        支持表级锁（锁一张表）
+        不支持事务 不支持事务回滚
+   innodb
+        表.frm 表结构
+        表.ibd表结构 索引信息
+        支持行级锁（只给当前被访问的行加锁）
+        支持事务 事务回滚
+        事务日志文件 ：记录对innodb存储引擎的表执行过的操作
+        /var/lib/mysql/ib_logfile*
+        
+   锁：
+        锁类型：读锁 select 
+         写锁insert delete update
+        锁粒度：行级锁  表级锁
+        锁作用：解决并发访问冲突问题
+        
+ 事务：一次从开始访问到访问结束的过程
+        事务回滚：一次数据访问 任意一步执行失败，恢复所有操作。
+        事务的特性：一致性，原子性，隔离性
+        最典型的事务操作：银行转账
+        
+        工作如何决定表使用的存储引擎
+        接收写操作多的表适合使用innodb存储引擎。（并发访问大）
+        接收读操作多的表适合使用myisam存储引擎。(节省资源)
+        
+设置数据库服务的存储引擎
+        
+        设置服务的默认存储引擎
+        [mysqld]
+        defaulf-storage-engine=myisam
+        
+        mysql> create table tt1(id int(2));
+        mysql> show create table tt1;
+        ...
+        | tt1   | CREATE TABLE `tt1` (
+          `id` int(2) DEFAULT NULL
+        ) ENGINE=MyISAM DEFAULT CHARSET=latin1 |
+        ...
+        修改表的存储引擎
+        alter table 表名 engine=存储引擎；
+        
+        设置表的存储引擎
+        creat table 表名（...）engine=存储引擎;
+        

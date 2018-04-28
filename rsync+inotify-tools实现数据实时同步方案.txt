@@ -1,0 +1,249 @@
+简介：
+
+rsync数据同步优缺点
+
+ 与传统的cp、tar备份方式相比，rsync具有安全性高、备份迅速、支持增量备份等优点，通过rsync可以解决对实时性要求不高的数据备份需求，例如定期的备份文件服务器数据到远端服务器，对本地磁盘定期做数据镜像等。
+ 随着应用系统规模的不断扩大，对数据的安全性和可靠性也提出的更好的要求，rsync在高端业务系统中也逐渐暴露出了很多不足。首先，rsync同步数据时，需要扫描所有文件后进行比对，进行差量传输。如果文件数量达到了百万甚至千万量级，扫描所有文件将是非常耗时的。而且正在发生变化的往往是其中很少的一部分，这是非常低效的方式。其次，rsync不能实时的去监测、同步数据，虽然它可以通过linux守护进程的方式进行触发同步，但是两次触发动作一定会有时间差，这样就导致了服务端和客户端数据可能出现不一致，无法在应用故障时完全的恢复数据。基于以上原因，rsync+inotify组合出现了！
+inotify
+
+ inotify是一种强大的、细粒度的、异步的文件系统事件监控机制，linux内核从2.6.13起，加入了inotify支持，通过inotify可以监控文件系统中添加、删除，修改、移动等各种细微事件，利用这个内核接口，第三方软件就可以监控文件系统下文件的各种变化情况，而inotify-tools就是这样的一个第三方软件。
+
+
+一、环境准备
+
+操作系统：CentOS release 6.8 (Final) x86_64
+
+服务器IP：
+
+rsync_server（数据源）192.168.0.44
+rsync_client（目标端）192.168.0.45
+同步目录：
+
+rsync_server       /app/rsync_server
+rsync_client       /app/rsync_client
+二、安装及配置rsync
+
+客户端配置（目标端）
+
+1、安装rsync
+
+# yum -y install rsync xinetd
+# cp /etc/xinetd.d/rsync{,.bak}
+# vim /etc/xinetd.d/rsync
+service rsync
+{
+        disable = no            #修改为no
+        flags           = IPv6
+        socket_type     = stream
+        wait            = no
+        user            = root
+        server          = /usr/bin/rsync
+        server_args     = --daemon
+        log_on_failure  += USERID
+}
+# /etc/init.d/xinetd start
+2、配置rsync
+
+# vim /etc/rsyncd.conf    #创建配置文件
+
+logfile = /var/log/rsyncd.log    #日志文件位置，启动rsync后自动产生这个文件，无需提前创建
+pidfile = /var/run/rsyncd.pid    #pid文件的存放位置
+lockfile = /var/run/rsync.lock   #支持max connections参数的锁文件
+secretsfile = /etc/rsync.pass    #用户认证配置文件，里面保存用户名称和密码，后面会创建这个文件
+motdfile = /etc/rsyncd.Motd    #rsync启动时欢迎信息页面文件位置（文件内容自定义）
+[app_rsync_client]   #自定义名称
+path = /app/rsync_client/    #rsync服务端数据目录路径
+comment = app_rsync_client    #模块名称与[app_rsync_client]自定义名称相同
+uid = root    #设置rsync运行权限为root
+gid = root    #设置rsync运行权限为root
+port =873
+use chroot = no    #默认为true，修改为no，增加对目录文件软连接的备份
+read only = no    设置rsync服务端文件为读写权限
+list = no    #不显示rsync服务端资源列表
+mac connections = 200
+timeout = 600
+auth users = rsync    #执行数据同步的用户名，可以设置多个，用英文状态下逗号隔开
+hosts allow = 192.168.0.45   #允许进行数据同步的客户端IP地址，可以设置多个，用英文状态下逗号隔开
+hosts deny = 192.168.0.46,192.168.0.47    #禁止数据同步的客户端IP地址，可以设置多个，用英文状态下逗号隔开,先允许后拒绝
+3、配置rsync同步的账户密码
+
+# vim /etc/rsync.pass    #配置文件，添加以下内容
+rsync:123456    #格式，用户名:密码，可以设置多个，每行一个用户名:密码
+4、赋权启动rsync
+
+# chmod 600 /etc/rsyncd.conf 
+# chmod 600 /etc/rsync.pass 
+# /etc/init.d/xinetd restart
+服务端配置（数据源）
+
+1、安装rsync
+
+# yum install rsync xinetd
+# vim /etc/xinetd.d/rsync
+service rsync
+{
+        disable = no    #修改为no
+        flags           = IPv6
+        socket_type     = stream
+        wait            = no
+        user            = root
+        server          = /usr/bin/rsync
+        server_args     = --daemon
+        log_on_failure  += USERID
+}
+2、配置rsync同步的账户密码
+
+# vim /etc/passwd.txt
+123456
+
+# chmod 600 /etc/passwd.txt
+3、测试手动同步
+
+# mkdir -pv /app/rsync_server && touch /app/rsync_server/test.txt
+在rsync_server的/app/rsync_server目录下创建文件test.txt，在rsync_server端运行同步命令同步数据：
+
+rsync -avH --port=873 --progress --delete  /app/rsync_client/ rsync@192.168.0.45::app_rsync_client --password-file=/etc/passwd.txt
+
+注释：
+/app/rsync_server/             #数据源的目录
+-password-file=/etc/passwd.txt #数据源的密码文件
+rsync@10.15.43.228::app_rsync_client #rsync目标端rsync服务端配置的用户名，app_rsync_client目标端rsync服务端配置的模块名称
+
+检查客户端rsync_client目录
+
+# ls /app/rsync_client/
+test.txt
+三、安装Inotify-tools实时触发rsync进行同步
+
+这里可以参考github上的官方wiki文档（包含安装及配置使用示例）
+https://github.com/rvoicilas/inotify-tools/wiki
+1、下载安装Inotify-tools
+
+# uname -r        #Linux下支持inotify的内核最小为2.6.13
+2.6.32-642.el6.x86_64
+
+# 安装前要先下载epel源
+# yum install inotify-tools -y
+
+查看其程序是否安装成功
+# rpm -qa inotify-tools
+inotify-tools-3.14-1.el6.x86_64
+
+查看程序包含的文件
+#rpm -ql inotify-tools
+/usr/bin/inotifywait
+/usr/bin/inotifywatch
+/usr/lib64/libinotifytools.so.0
+/usr/lib64/libinotifytools.so.0.4.1
+/usr/share/doc/inotify-tools-3.14
+/usr/share/doc/inotify-tools-3.14/AUTHORS
+/usr/share/doc/inotify-tools-3.14/COPYING
+/usr/share/doc/inotify-tools-3.14/ChangeLog
+/usr/share/doc/inotify-tools-3.14/NEWS
+/usr/share/doc/inotify-tools-3.14/README
+/usr/share/man/man1/inotifywait.1.gz
+/usr/share/man/man1/inotifywatch.1.gz
+2、配置inotify-tools
+
+# sysctl -a|egrep -i "max_queued_events|max_user_watches|max_user_instances"    #修改inotify默认参数（inotify默认内核参数值太小）
+fs.inotify.max_user_instances = 128
+fs.inotify.max_user_watches = 8192
+fs.inotify.max_queued_events = 16384
+fs.epoll.max_user_watches = 201420
+
+# vim /etc/sysctl.conf 添加
+fs.inotify.max_queued_events = 99999999
+fs.inotify.max_user_watches = 99999999
+fs.inotify.max_user_instances = 65535
+
+#sysctl  -p   参数立即生效
+
+# cat /proc/sys/fs/inotify/{max_user_instances,max_user_watches,max_queued_events}  #检查参数是否生效
+65535
+99999999
+99999999
+
+
+注释：
+    max_queued_events：inotify队列最大长度，如果值太小，会出现"** Event Queue Overflow **"错误，导致监控文件不准确
+    max_user_watches：要同步的文件包含多少目录，可以用：find /app/rsync_server/ -type d | wc -l 统计，必须保证max_user_watches值大于统计结果（这里/app/rsync_server/为同步文件目录）
+    max_user_instances：每个用户创建inotify实例最大值
+3、创建实时同步脚本
+
+# vim  /usr/local/inotify/rsync.sh
+#!/bin/bash
+src_dir="/app/rsync_server/"
+dst_dir="app_rsync_client"
+exclude_dir="/usr/local/inotify/exclude.list"
+rsync_user="rsync"
+rsync_passwd="/etc/passwd.txt"
+dst_ip="192.168.0.45"
+rsync_command(){
+                  rsync -avH --port=873 --progress --delete --exclude-from=$exclude_dir $src_dir $rsync_user@$ip::$dst_dir --password-file=$rsync_passwd
+}
+for ip in $dst_ip;do
+     rsync_command
+done
+    /usr/bin/inotifywait -mrq --timefmt '%d/%m/%y %H:%M' --format '%T %w%f%e' -e close_write,modify,delete,create,attrib,move $src_dir \
+| while read file;do
+   for ip in $dst_ip;do
+       rsync_command
+       echo "${file} was rsynced" >> /tmp/rsync.log 2>&1
+   done
+ done 
+
+注释：
+    src_dir="/app/rsync_server/"    #源服务器同步目录
+    dst_dir="app_rsync_client"    #目标服务器rsync同步目录模块名称
+    exclude_dir="/usr/local/inotify/exclude.list"    #不需要同步的目录，如果有多个，每一行写一个目录，使用相对于同步模块的路径；
+    例如：不需要同步/app/rsync_server/"目录下的a目录和b目录下面的b1目录，exclude.list文件可以这样写
+    a/
+    b/b1/
+
+    rsync_user="rsync"    #目标服务器rsync同步用户名
+    rsync_passwd="/etc/passwd.txt"    #目标服务器rsync同步用户的密码在源服务器的存放路径
+    dst_ip="192.168.0.45"    #目标服务器ip，多个ip用空格分开
+
+##赋权，添加开机启动
+
+# chmod +x /usr/local/inotify/rsync.sh
+# touch /usr/local/inotify/exclude.list
+# vim /etc/rc.d/rc.local
+nohup /bin/sh /usr/local/inotify/rsync.sh &
+# nohup /bin/sh /usr/local/inotify/rsync.sh &
+4、测试
+
+在rsync_server（数据源）192.168.0.44的/app/rsync_server创建文件
+# cd /app/rsync_server
+# touch test{1..9}
+# touch test{a..j}
+# ls
+test1  test2  test3  test4  test5  test6  test7  test8  test9  testa  testb  testc  testd  teste  testf  testg  testh  testi  testj
+
+在rsync_client（目标端）192.168.0.45上查看已经同步
+# cd /app/rsync_client
+# ls
+test1  test2  test3  test4  test5  test6  test7  test8  test9  testa  testb  testc  testd  teste  testf  testg  testh  testi  testj
+如果以上测试都通过，说明inotify实时触发rsync同步脚本运行正常。
+至此，Linux下Rsync+Inotify-tools实现数据实时同步完成。如果要双向同步可以把以上反过来部署一次。
+FAQ
+
+Q1:
+
+#rsync -avH --port=873 --progress --delete /app/rsync_client/ rsync@192.168.0.45::app_rsync_client --password-file=/etc/passwd.txt
+
+@ERROR: auth failed on module app_rsync_client
+rsync error: error starting client-server protocol (code 5) at main.c(1503) [sender=3.0.6]
+
+A：如果出现这个错误，请详细检查配置文件是否有误，建议删掉无用的注释
+
+Q2:
+
+#rsync -avH --port=873 --progress --delete /app/rsync_client rsync@192.168.0.45::app_rsync_client --password-file=/etc/passwd.txt
+
+sending incremental file list
+rsync: link_stat "/app/rsync_client" failed: No such file or directory (2)
+
+A:检查客户端及服务端文件夹是否存在，这里应该还有一个坑，就是这里是在服务端(数据源)同步，目录应该指向“/app/rsync_client”
+
+因此，如果是同步应用程序目录，建议这里的源目录，与目标目录设置为同一个。

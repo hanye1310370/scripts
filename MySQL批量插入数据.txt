@@ -1,0 +1,141 @@
+MySQL批量插入数据
+
+ 2016-10-18 MySQL, PHP教程 发表评论
+目录
+1 多条语句
+2 赋多个值
+MySQL插入多条数据有二种方法，一种是写多条insert语句，再用逗号;分割每条语句，另外一种是用insert一次性赋多个值。
+
+1 多条语句
+写多条insert，用同数量的;号隔开，让MySQL执行多次。比如:
+
+insert into table (field1, field2, field3) value ("a", "b", "c");
+insert into table (field1, field2, field3) value ("d", "e", "f");
+insert into table (field1, field2, field3) value ("g", "h", "i");
+这种方法在插入大数据、高并发时，效率很低。
+
+2 赋多个值
+在insert中写多个值：
+
+INSERT INTO table (field1, field2, field3) VALUES ("a", "b", "c"), ("d", "e", "f"), ("g", "h", "i");
+如果列名完全对应，也可以这样写：
+
+INSERT INTO table VALUES ("", "b", "c"), ("", "e", "f"), ("", "h", "i");
+其中，第一列是自增的主键，也必须传入，内容为空。
+
+
+
+1.创建一张数据表
+
+mysql> create table test_while (
+    ->   id int primary key) charset = utf8;
+Query OK, 0 rows affected (0.28 sec)
+  查看数据表的结构
+
+ 
+
+复制代码
+mysql> desc test_while;
++-------+---------+------+-----+---------+-------+
+| Field | Type    | Null | Key | Default | Extra |
++-------+---------+------+-----+---------+-------+
+| id    | int(11) | NO   | PRI | NULL    |       |
++-------+---------+------+-----+---------+-------+
+1 row in set (0.01 sec)
+复制代码
+2.创建存储过程，在begin..end里面写while循环以及insert语句
+
+复制代码
+mysql> delimiter #
+mysql> create procedure test_two()
+    -> begin
+    ->     declare i int default 0;
+    ->     while i < 10 do
+    ->         insert into test_while(id) values(i);
+    ->         set i = i + 1;
+    ->     end while;
+    -> end #
+Query OK, 0 rows affected (0.00 sec)
+复制代码
+   注释：(1)delimiter 中文意思定界符，分隔符，   在MySQL中用来设置语句的结束符。MySQL的默认结束符是 ; 设置 delimiter # 之后begin..end中以分号结束的代码
+
+          块就不会执行啦， 然后在end后面加#结束符结束。 在创建完存储过程后用delimiter ; 恢复默认设置
+
+           (2)declare 定义一个变量  declare int i default 0;   定义一个初始值为0的整型变量
+
+ 
+
+3.调用存储过程
+
+mysql> delimiter ;
+mysql> call test_two();
+Query OK, 1 row affected (0.35 sec)
+4.查看存储过程中的代码块是否调用成功了
+
+复制代码
+mysql> select * from test_while;
++----+
+| id |
++----+
+|  0 |
+|  1 |
+|  2 |
+|  3 |
+|  4 |
+|  5 |
+|  6 |
+|  7 |
+|  8 |
+|  9 |
++----+
+10 rows in set (0.00 sec)
+复制代码
+
+
+
+
+在平时的开发中一定会遇到一中情况记录存在就跟新不存在就插入的情况，一般的做法就是先查记录判断记录是否存在，不存在就执行插入语句，存在就执行更新语句
+
+如下例子
+
+$result = mysql_query('select * from xxx where id = 1');
+$row = mysql_fetch_assoc($result);
+if($row){
+mysql_query('update ...');
+}else{
+mysql_query('insert ...');
+}
+这样的写法有两个缺点
+1、效率太差，每次执行都要执行2个sql
+2、高并发的情况下数据会出问题
+怎么解决这个问题呢？
+mysql提供了insert … on duplicate key update的语法，如果insert的数据会引起唯一索引（包括主键索引）的冲突，即这个唯一值重复了，则不会执行insert操作，而执行后面的update操作
+测试一下
+
+create table test(
+id int not null primary key,
+num int not null UNIQUE key,
+tid int not null
+)
+为了测试两个唯一索引都冲突的情况，然后插入下面的数据
+
+insert into test values(1,1,1), (2,2,2);
+然后执行：
+
+insert into test values(1,2,3) on duplicate key update tid = tid + 1;
+因为a和b都是唯一索引，插入的数据在两条记录上产生了冲突，然而执行后只有第一条记录被修改
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

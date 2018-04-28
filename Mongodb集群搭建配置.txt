@@ -1,0 +1,159 @@
+Mongodb集群有三种模式：  Replica Set 、 Sharding、Master-Slaver
+这里举例说明Replica Set的搭建方式
+Mongodb版本：mongodb-linux-x86_64-2.2.6.tgz
+下载地址：wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-2.2.6.tgz
+Mongodb的安装配置很简单，下载源码包解压后配置参数启动即可
+
+服务器分布情况：
+主机	用途
+192.168.1.100	主节点(master)
+192.168.1.101	备节点+仲裁点(slave+arbiter)
+一、在每台机器上解压源包并建立数据目录：
+tar zxf mongodb-linux-x86_64-2.2.6.tgz
+mv mongodb-linux-x86_64-2.2.6 /usr/local/mongodb
+mkdir -p /data/mongodb/{master,slave,arbiter}
+二、建立配置文件：
+主节点：
+vi /etc/mongodb_master.conf
+
+#master.conf
+dbpath=/data/mongodb/master
+logpath=/data/mongodb/master.log
+pidfilepath=/data/mongodb/master.pid
+#keyFile=/data/mongodb/mongodb.key
+directoryperdb=true
+logappend=true
+replSet=91db
+bind_ip=192.168.1.100
+port=27017
+#auth=true
+oplogSize=100
+fork=true
+noprealloc=true
+#maxConns=4000
+
+备节点：
+vi /etc/mongodb_slave.conf
+
+#slave.conf
+dbpath=/data/mongodb/slave
+logpath=/data/mongodb/slave.log
+pidfilepath=/data/mongodb/slave.pid
+#keyFile=/data/mongodb/mongodb.key
+directoryperdb=true
+logappend=true
+replSet=91db
+bind_ip=192.168.1.101
+port=27017
+#auth=true
+oplogSize=100
+fork=true
+noprealloc=true
+#maxConns=4000
+
+仲裁点：
+vi /etc/mongodb_arbiter.conf
+
+#arbiter.conf
+dbpath=/data/mongodb/arbiter
+logpath=/data/mongodb/arbiter.log
+pidfilepath=/data/mongodb/arbiter.pid
+#keyFile=/data/mongodb/mongodb.key
+directoryperdb=true
+logappend=true
+replSet=91db
+bind_ip=192.168.1.101
+port=27019
+#auth=true
+oplogSize=100
+fork=true
+noprealloc=true
+#maxConns=4000
+
+备注：
+keyFile和auth选项要在集群配置好后，并且添加了验证用户后在启用
+
+参数说明：
+dbpath：存放数据目录
+logpath：日志数据目录
+pidfilepath：pid文件
+keyFile：节点之间用于验证文件，内容必须保持一致，权限600，仅Replica Set 模式有效
+directoryperdb：数据库是否分目录存放
+logappend：日志追加方式存放
+replSet：Replica Set的名字
+bind_ip：mongodb绑定的ip地址
+port：端口
+auth：是否开启验证
+oplogSize：设置oplog的大小（MB）
+fork：守护进程运行，创建进程
+moprealloc：是否禁用数据文件预分配（往往影响性能）
+maxConns：最大连接数，默认2000
+
+三、启动mongodb（可以相对路径也可以绝对路径）
+/usr/local/mongodb/bin/mongod -f /etc/mongodb_master.conf
+/usr/local/mongodb/bin/mongod -f /etc/mongodb_slave.conf
+/usr/local/mongodb/bin/mongod -f /etc/mongodb_arbiter.conf
+四、在主节点上配置
+/usr/local/mongodb/bin/mongo 192.168.1.100     #因为备节点和仲裁点在同一个机器以端口区分，所以登陆时要加上端口
+>use admin
+>cfg={ _id:"91db", members:[ {_id:0,host:'192.168.1.100:27017',priority:2},{_id:1,host:'192.168.1.101:27017',priority:1},{_id:2,host:'192.168.1.101:27019',arbiterOnly:true}] };
+> rs.initiate(cfg)          #使cfg配置生效
+说明：
+cfg名字可选，只要跟mongodb参数不冲突，_id为Replica Set名字，members里面的优先级priority值高的为主节点，对于仲裁点一定要加上arbiterOnly:true，否则主备模式不生效
+查看是否生效：rs.status()
+结果显示每天机器的信息，stateStr字段为主备仲裁节点的标志，下面会显示字样："ok" : 1
+
+91db:PRIMARY> rs.status()
+{
+	"set" : "91db",
+	"date" : ISODate("2017-09-22T07:19:45Z"),
+	"myState" : 1,
+	"members" : [
+		{
+			"_id" : 0,
+			"name" : "192.168.1.204:27017",
+			"health" : 1,
+			"state" : 1,
+			"stateStr" : "PRIMARY",
+			"uptime" : 125,
+			"optime" : Timestamp(1506064497, 1),
+			"optimeDate" : ISODate("2017-09-22T07:14:57Z"),
+			"self" : true
+		},
+		{
+			"_id" : 1,
+			"name" : "192.168.1.190:27017",
+			"health" : 1,
+			"state" : 2,
+			"stateStr" : "SECONDARY",
+			"uptime" : 73,
+			"optime" : Timestamp(1506064497, 1),
+			"optimeDate" : ISODate("2017-09-22T07:14:57Z"),
+			"lastHeartbeat" : ISODate("2017-09-22T07:19:45Z"),
+			"lastHeartbeatRecv" : ISODate("2017-09-22T07:19:43Z"),
+			"pingMs" : 5,
+			"lastHeartbeatMessage" : "syncing to: 192.168.1.204:27017",
+			"syncingTo" : "192.168.1.204:27017"
+		},
+		{
+			"_id" : 2,
+			"name" : "192.168.1.193:27019",
+			"health" : 1,
+			"state" : 7,
+			"stateStr" : "ARBITER",
+			"uptime" : 30,
+			"lastHeartbeat" : ISODate("2017-09-22T07:19:43Z"),
+			"lastHeartbeatRecv" : ISODate("2017-09-22T07:19:44Z"),
+			"pingMs" : 1
+		}
+	],
+	"ok" : 1
+}
+
+
+
+91db:SECONDARY> rs.slaveOk();
+91db:SECONDARY> db.testdb.find();
+{ "_id" : ObjectId("59c4b24c7cc15236bc06e7e2"), "demo" : "demo" }
+{ "_id" : ObjectId("59c4b4bc7cc15236bc06e7e3"), "test1" : "testval1" }
+{ "_id" : ObjectId("59c4b8717cc15236bc06e7e4"), "test2" : "testval2" }

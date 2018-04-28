@@ -1,0 +1,256 @@
+mysql 数据库服务
+#主配置文件
+
+/etc/my.cnf 
+#查看服务状态
+
+systemctl status mysqld
+#数据库目录
+
+/var/lib/mysql      
+#数据库进程名
+
+[root@mysql ~]#ps -C mysqld     
+    PID TTY          TIME CMD
+ 5604 ?        00:00:00 mysqld
+#默认端口号
+
+[root@mysql ~]#netstat -pantu | grep 3306   
+tcp6       0      0 :::3306                 :::*                    LISTEN      5604/mysqld    
+#进程所属者
+
+[root@mysql ~]#grep mysql /etc/passwd       
+    mysql:x:27:27:MySQL Server:/var/lib/mysql:/bin/false
+#进程所属组
+
+[root@mysql ~]#grep mysql /etc/group        
+mysql:x:27:
+[root@mysql ~]# ps aux | grep mysqld
+mysql     5604  0.2 16.8 1119216 171772 ?      Sl   21:36   0:00 /usr/sbin/mysqld --daemonize --pid-file=/var/run/mysqld/mysqld.pid
+root      5754  0.0  0.0 112660   972 pts/0    R+   21:39   0:00 grep --color=auto mysqld
+[root@mysql ~]# ls -ld /var/lib/mysql
+drwxr-x--x. 5 mysql mysql 4096 12月 19 21:36 /var/lib/mysql
+#mysql 启动后自动生成的日志文件
+
+[root@mysql ~]# ls /var/log/mysqld.log  
+/var/log/mysqld.log
+使用sql命令管理数据库
+
+sql 命令分类
+DDL数据定义语言     （create  alter  drop）
+DML数据操作语言      ( insert  update   delete   select )
+DCL数据控制语言      ( grant  revoke )
+DTL数据事物语言      ( commit  rollback  savepoint )
+把数据存储到数据库服务器上的过程
+
+1,连接数据库服务器
+客户端自己提供连接工具
+
+2,创建库（文件夹）
+数据库命名规则？
+不能纯数字
+不能有特殊符号
+不能用关键字
+唯一性
+创建库
+
+create database 库名;
+mysql> create database gamedb;
+#在对应数据库目录会生成相关文件
+
+[root@mysql4-1 mysql]# ls /var/lib/mysql/gamedb/
+db.opt
+查看已有库
+
+mysql> show databases;
+删除库
+
+mysql> drop database gamedb;
+Query OK, 0 rows affected (0.00 sec)
+
+[root@mysql4-1 mysql]# ls /var/lib/mysql/gamedb/
+ls: 无法访问/var/lib/mysql/gamedb/: 没有那个文件或目录
+切换库
+
+use 库名;
+
+mysql> use mysql;
+查看当前所在的库
+
+mysql> select database();
++---------------+
+| database()    |
++---------------+
+| NULL         |
++---------------+
+1 row in set (0.00 sec)
+查看库里已有的表
+
+mysql> show tables;
+3.建表（文件）
+
+create table 库名.表名（
+字段名 字符类型，
+字段名 数值类型，
+...
+）;
+
+mysql> create table gamedb.stu(
+        -> name char(10),
+        -> age int
+        -> );
+插入表记录
+insert into 库名.表名 values（值列表）
+
+mysql> insert into gamedb.stu values ("jim",23),("tom",21);
+查看表记录
+select * from 库名.表名;
+
+mysql> select * from stu;
++-------+--------+
+| name   | age       |
++----------+----------+
+| jim      |   23       |
+| tom       |   21     |
++----------+----------+
+查看表结构
+desc 库名.表名
+
+mysql> desc gamedb.stu;
+删除表记录
+delete from 库名.表名
+
+mysql> delete from gamedb.stu;
+Query OK, 2 rows affected (0.03 sec)
+mysql> select * from stu;
+Empty set (0.00 sec)
+删除表
+drop table 库名.表名
+
+mysql> drop table gamedb.stu;
+Query OK, 0 rows affected (0.24 sec)
+mysql> show tables;
+Empty set (0.00 sec)
+mysql数据类型
+支持的数据类型
+
+数值型：整型，浮点型
+
+整型：根据存储数值的范围整型分为：
+
+    tinyint          smallint    mediumint      int               bigint
+    1个字节     2个字节     3个字节         4个字节      8个字节
+
+create table t3(age int unsigned);      #unsigned 不允许存储负数
+浮点型：根据存储数值的范围分为：
+
+单精度：float (n,m) n表是总位数，m表示小数位位数
+        float(7,2) xxxxx.xx
+                         99999.99
+                        -99999.99 
+双精度：double
+
+数值类型 的宽度 是显示宽度，不能限制给字段赋值的大小，大小由类型决定
+赋值 宽度为节省空间
+宽度不够时：
+默认用空格补位
+zerofill #宽度不够用零补位
+mysql> create table t24(id int(3) zerofill,age int(5) zerofill);
+Query OK, 0 rows affected (0.40 sec)
+
+mysql> insert into t24 values(2,2);
+Query OK, 1 row affected (0.16 sec)
+
+mysql> select * from t24;
++----------+------------+
+| id        | age       |
++----------+------------+
+|  002     |   00002    |
++---------+------------+
+1 row in set (0.00 sec)
+mysql> desc t24;
+字符型： 定长 变长 大文本
+
+     char       varchar blob/text
+定长长度固定  空间换时间
+变长长度随字符大小而改变    时间换空间
+日期时间型：
+
+年 yesr  YYYY            1901-2155 可以使用两位数字给yesr赋值
+日期 date     YYYYMMDD
+时间 time     HHMMSS
+日期时间
+datetime    YYYYMMDDHHMMSS  如果不给其赋值 默认赋值NULL
+timestamp   YYYYMMDDHHMMSS  如果不给其赋值 默认自动赋值当前时间
+
+使用时间函数给日期赋值
+now()       #当前时间
+
+mysql> select now();
++-------------------------------------+
+| now()                                  |
++-------------------------------------+
+| 2017-12-20 03:49:11           |
++-------------------------------------+
+1 row in set (0.00 sec)
+
+year()  指定日期中的年
+
+    mysql> select year( now());
+
+month() 指定时间中的月份
+day()       指定时间中的日子
+date()  指定时间中的日期
+time()  指定时间中的时刻
+
+insert into t10 values ('tom',19,year(now()), time(now()),date(now()),now());
+枚举型：字段的值只能在列举的范围内选择
+
+字段名  enum(值列表) 单选
+字段名  set (值列表) 多选
+字段约束条件
+
+设置字段约束条件:作用
+Null  允许未空,默认设置
+NOT NULL 不允许为空
+Key     索引类型
+Default 设置默认值，缺省为NULL
+
+mysql> create table t13 (
+        -> name char(10) not null,
+        -> age tinyint default 23,
+        -> sex enum('man','woman') not null default 'man'
+        -> );
+Query OK, 0 rows affected (0.37 sec)
+mysql> desc t13;
+修改表结构
+
+alter table 表名 执行动作;
+添加新字段
+
+add 字段  类型(宽度)约束条件；         #添加末尾
+add 字段  类型(宽度)约束条件 first；       #添加开头
+add 字段  类型(宽度)约束条件 after 字段名；   #添加到某个字段后
+mysql> alter table t11 add name char(10) first;
+mysql> alter table t11 add mail varchar(30) default 'stu@tedu.cn';
+mysql> alter table t11 add class char(10) default 'nsd1709' after name;
+删除字段
+
+drop 字段名
+mysql> alter table t11 drop party,drop mail;
+
+不修改的地方照抄原有的
+修改字段类型
+
+modify 字段  类型(宽度)约束条件；
+mysql> alter table t11 modify name varchar(15) ;
+
+修改字段名
+change 源字段名 新字段名  类型(宽度)约束条件；
+mysql> alter table t11 change meetting party timestamp not null;
+修改表名
+mysql> alter table t11 rename stuinfo;
+
+mysql> use information_schema;
+过滤某个数据库的约束
+mysql> select * from table_constraints where table_schema='数据库名';

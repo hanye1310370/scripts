@@ -1,0 +1,145 @@
+1.获取crumb:
+root@debian45:~# curl -u fx_test:123456    http://192.168.1.45:8090/crumbIssuer/api/json
+{"_class":"hudson.security.csrf.DefaultCrumbIssuer","crumb":"5d89b728ca24f7fa380dfd6074baa0bf","crumbRequestField":"Jenkins-Crumb"}
+2.记录crumb:
+"crumb":5d89b728ca24f7fa380dfd6074baa0bf
+3.自动禁用disable Project:
+curl --user fx_test:123456   -H "Jenkins-Crumb:5d89b728ca24f7fa380dfd6074baa0bf" -X POST  http://192.168.1.45:8090/job/aa/disable  （启用enable）
+4.查询job的状态：
+root@debian45:~# curl --silent http://192.168.1.45:8090/job/aa/lastBuild/api/json --user  fx_test:123456
+{"_class":"hudson.model.FreeStyleBuild","actions":[{"_class":"hudson.model.CauseAction","causes":[{"_class":"hudson.model.Cause$UserIdCause","shortDescription":"Started by user fx_test","userId":"fx_test","userName":"fx_test"}]},{},{}],"artifacts":[],"building":false,"description":null,"displayName":"#6","duration":10057,"estimatedDuration":3407,"executor":null,"fullDisplayName":"aa #6","id":"6","keepLog":false,"number":6,"queueId":352,"result":"SUCCESS","timestamp":1523175907694,"url":"http://192.168.1.45:8090/job/aa/6/","builtOn":"","changeSet":{"_class":"hudson.scm.EmptyChangeLogSet","items":[],"kind":null},"culprits":[]}
+5.获取build的num
+curl --silent http://192.168.1.45:8090/job/aa/lastBuild/buildNumber   --user  fx_test:123456
+6
+6.获取最近成功的build的num
+curl --silent http://192.168.1.45:8090/job/aa/lastStableBuild/buildNumber   --user  fx_test:123456
+6
+6.无参调用构建任务
+curl --user fx_test:123456   -H "Jenkins-Crumb:5d89b728ca24f7fa380dfd6074baa0bf" -X POST  http://192.168.1.45:8090/job/aa/build
+7.不设置参数/使用默认参数
+root@debian45:~#  curl -u devops:98a99e1cb62f8099605e2ac138809f7d -H"Jenkins-Crumb:2dc85050f762edacf8d397fb1b41f6a1" -X POST http://jenkins.1fangxin.cn/job/%E6%88%BF%E4%BF%A1%E4%BA%91%E5%B9%B3%E5%8F%B0-%E6%B1%9F%E8%A5%BF%E7%94%9F%E4%BA%A7%E7%8E%AF%E5%A2%83/buildWithParameters
+ curl -u devops:98a99e1cb62f8099605e2ac138809f7d -H"Jenkins-Crumb:2dc85050f762edacf8d397fb1b41f6a1" -X POST http://192.168.1.45:8090/job/aa/buildWithParameters
+8.设置参数方法1
+curl -u devops:98a99e1cb62f8099605e2ac138809f7d -H"Jenkins-Crumb:2dc85050f762edacf8d397fb1b41f6a1" -X POST http://jenkins.1fangxin.cn/job/%E6%88%BF%E4%BF%A1%E4%BA%91%E5%B9%B3%E5%8F%B0-%E6%B1%9F%E8%A5%BF%E7%94%9F%E4%BA%A7%E7%8E%AF%E5%A2%83/buildWithParameters -d jiangxi=all
+9.删除job
+curl --user fx_test:123456   -H "Jenkins-Crumb:5d89b728ca24f7fa380dfd6074baa0bf" -X POST  http://192.168.1.45:8090/job/aa/doDelete
+10.获取项目描述：
+root@debian45:~# curl --user fx_test:123456   -H "Jenkins-Crumb:5d89b728ca24f7fa380dfd6074baa0bf" -X GET   http://192.168.1.45:8090/job/erp_test2/description
+erp_test2 
+11.获取配置文件：
+root@debian45:~# curl --user fx_test:123456   -X GET   http://192.168.1.45:8090/job/erp_test2/config.xml
+<?xml version='1.1' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description>erp_test2</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <org.jenkinsci.plugins.gitbucket.GitBucketProjectProperty plugin="gitbucket@0.8">
+      <linkEnabled>false</linkEnabled>
+    </org.jenkinsci.plugins.gitbucket.GitBucketProjectProperty>
+    <com.dabsquared.gitlabjenkins.connection.GitLabConnectionProperty plugin="gitlab-plugin@1.5.4">
+      <gitLabConnection></gitLabConnection>
+    </com.dabsquared.gitlabjenkins.connection.GitLabConnectionProperty>
+    <org.jenkinsci.plugins.gitlablogo.GitlabLogoProperty plugin="gitlab-logo@1.0.3">
+      <repositoryName></repositoryName>
+    </org.jenkinsci.plugins.gitlablogo.GitlabLogoProperty>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>5</daysToKeep>
+        <numToKeep>5</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <net.uaznia.lukanus.hudson.plugins.gitparameter.GitParameterDefinition plugin="git-parameter@0.9.1">
+          <name>git_branch</name>
+          <description>targe</description>
+          <uuid>c006fb1e-6808-4bab-8c51-516db827603c</uuid>
+          <type>PT_BRANCH</type>
+          <branch></branch>
+          <tagFilter>*</tagFilter>
+          <branchFilter>.*feature/chaoyang/bargain_financial.*</branchFilter>
+          <sortMode>NONE</sortMode>
+          <defaultValue></defaultValue>
+          <selectedValue>NONE</selectedValue>
+          <quickFilterEnabled>false</quickFilterEnabled>
+        </net.uaznia.lukanus.hudson.plugins.gitparameter.GitParameterDefinition>
+        <hudson.model.ChoiceParameterDefinition>
+          <name>target</name>
+          <description>erptest2</description>
+          <choices class="java.util.Arrays$ArrayList">
+            <a class="string-array">
+              <string>erp</string>
+            </a>
+          </choices>
+        </hudson.model.ChoiceParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <scm class="hudson.plugins.git.GitSCM" plugin="git@3.8.0">
+    <configVersion>2</configVersion>
+    <userRemoteConfigs>
+      <hudson.plugins.git.UserRemoteConfig>
+        <url>git@gitlab.1fangxin.cn:fangxin-tech/erp.git</url>
+      </hudson.plugins.git.UserRemoteConfig>
+    </userRemoteConfigs>
+    <branches>
+      <hudson.plugins.git.BranchSpec>
+        <name>${git_branch}</name>
+      </hudson.plugins.git.BranchSpec>
+    </branches>
+    <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
+    <submoduleCfg class="list"/>
+    <extensions/>
+  </scm>
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers/>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>jenkins_da=&quot;/home/jenkins/ops/workspace/erp_test2&quot;
+erp_da=&quot;/home/ops/erp/erptest2&quot;
+rm $erp_da/public -fr
+rm $erp_da/database/migrations -fr
+cd $erp_da
+cp ${jenkins_da}/* ${erp_da} -fr
+sudo chmod -R 777  $erp_da
+#sh /home/qa/erp_qa.shs
+composer install
+/home/ops/erp/erptest2/node_modules/.bin/gulp
+/usr/local/php/bin/php artisan migrate --force
+/usr/local/php/bin/php artisan cache:clear
+/usr/local/php/bin/php  artisan queue:restart </command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers/>
+  <buildWrappers/>
+</project>root@debian45:~#
+12.
+（1）创建job(需要创建目录）
+root@debian45:/home/jenkins/ops/jobs#mkdir aa
+root@debian45:/home/jenkins/ops/jobs# cp erp_test2/config.xml aa/
+root@debian45:/home/jenkins/ops/jobs# ll aa/
+总用量 4
+-rw-r--r-- 1 root root 3714 4月   9 09:37 config.xml
+root@debian45:/home/jenkins/ops/jobs# chown -R ops.ops aa
+root@debian45:/home/jenkins/ops/jobs# sed -i '1,$s/erptest2/aa/g' config.xml
+root@debian45:/home/jenkins/ops/jobs/aa# curl --user fx_test:123456   -H "Jenkins-Crumb:5d89b728ca24f7fa380dfd6074baa0bf"  -X POST   http://192.168.1.45:8090/createItem?name=aa  --data-binary "@config.xml" -H "Content-Type: text/xml"
+注：创建后默认是禁用的，需要手动启用
+root@debian45:/home/jenkins/ops/jobs/aa# curl --user fx_test:123456   -H "Jenkins-Crumb:5d89b728ca24f7fa380dfd6074baa0bf"  -X POST   http://192.168.1.45:8090/job/aa/enable
+（2）创建job(不需要创建目录，运行命令和config.xml同一目录下）
+root@debian45:/home/jenkins/ops/jobs/aa# cp config.xml  /root/
+root@debian45:/home/jenkins/ops/jobs/aa# cd 
+root@debian45:~# vi config.xml 
+root@debian45:~# curl --user fx_test:123456   -H "Jenkins-Crumb:5d89b728ca24f7fa380dfd6074baa0bf"  -X POST   http://192.168.1.45:8090/createItem?name=bb  --data-binary "@config.xml" -H "Content-Type: text/xml"
+（3）直接使用控制台,不需创建xml文件（将xml内容写入控制台中运行）
+
+#echo '<?xml version="1.0" encoding="UTF-8"?><project>…</project>' | curl -X POST -H 'Content-type:text/xml' -d @- http://localhost:8080/jenkins/createItem?name=jobfromcmd  
+
+
+

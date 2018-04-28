@@ -1,0 +1,9 @@
+git init 
+git remote add origin 链接地址
+git pull origin master
+
+dpgfjyjbcxfubbid
+
+$PROJECT_NAME - Build # $BUILD_NUMBER - $BUILD_STATUS:
+
+Check console output at $BUILD_URL to view the results.52

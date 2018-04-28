@@ -1,0 +1,224 @@
+在所有Web服务中apache算是最常见的服务，下面我就分步骤向大家介绍如何创建带Apache服务的Centos Docker镜像.
+
+基础镜像：
+
+[root@localhost ~]# docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
+sshd-centos         latest              64136bdc0cc8        22 hours ago        261.8 MB
+centos              latest              0f73ae75014f        5 weeks ago         172.3 MB
+1
+2
+3
+4
+其中镜像sshd-centos是以镜像centos为基础的开放SSH服务的镜像。 
+相关内容请参阅： 
+《创建支持SSH服务的CentOS镜像》 
+《通过Dockerfile创建支持SSH服务的CentOS镜像》
+
+一 、以镜像sshd-centos为基础新建容器，并指定容器的ssh端口22映射到宿主机的10022端口上
+
+docker run -p 10022:22 -d sshd-centos /usr/sbin/sshd -D
+1
+查看容器运行情况：
+
+[root@localhost ~]# docker ps -a
+CONTAINER ID        IMAGE               COMMAND               CREATED             STATUS                      PORTS                   NAMES
+66b4ab8dbdeb        sshd-centos         "/usr/sbin/sshd -D"   22 hours ago        Up 12 seconds               0.0.0.0:10022->22/tcp   trusting_morse   
+1
+2
+3
+二、在宿主机上通过ssh登录容器
+
+ssh localhost -p 10022
+1
+如果提示没有ssh命令请安装openssh-clients
+
+yum install -y openssh-clients
+1
+三、下载apache源码包，编译安装 
+1、安装wget
+
+yum install -y wget
+1
+2、下载源码包
+
+cd /usr/local/src
+wget http://apache.fayea.com/httpd/httpd-2.4.17.tar.gz
+1
+2
+3、解压源码包
+
+tar -zxvf httpd-2.4.17.tar.gz
+cd httpd-2.4.17
+1
+2
+4、安装gcc 、make编译器和apache依赖包 
+由于下载的docker镜像是简化版，所以连最基本的gcc和make都没有带，只好自已安装； 同时需要安装apache依赖包apr 和 pcre
+
+yum install -y gcc make apr-devel apr apr-util apr-util-devel pcre-devel
+1
+5、编译
+
+./configure --prefix=/usr/local/apache2  --enable-mods-shared=most  --enable-so
+
+make
+make install
+1
+2
+3
+4
+四，修改apache配置文件
+
+sed -i 's/#ServerName www.example.com:80/ServerName localhost:80/g' /usr/local/apache2/conf/httpd.conf
+1
+2
+五，启动apache服务
+
+ /usr/local/apache2/bin/httpd
+1
+查看是否启动
+
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root         1  0.0  0.0  11552  1332 ?        Ss   14:22   0:00 /bin/bash /usr/local/sbin/run.sh
+root         9  0.0  0.1  74660  3088 ?        S    14:22   0:00 /usr/local/apache2/bin/httpd
+root        10  0.0  0.0  82456  1340 ?        Ss   14:22   0:00 /usr/sbin/sshd
+daemon      11  0.0  0.2 484456  4328 ?        Sl   14:22   0:00 /usr/local/apache2/bin/httpd
+daemon      12  0.0  0.2 418920  4328 ?        Sl   14:22   0:00 /usr/local/apache2/bin/httpd
+daemon      13  0.0  0.2 484456  4908 ?        Sl   14:22   0:00 /usr/local/apache2/bin/httpd
+root       114  0.2  0.2  89648  4464 ?        Ss   14:29   0:00 sshd: root@pts/0
+root       116  0.0  0.0  13264  1888 pts/0    Ss   14:29   0:00 -bash
+root       133  0.0  0.0  21284  1260 pts/0    R+   14:29   0:00 ps aux
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+六、编写启动ssh和apache服务的脚本
+
+cd /usr/local/sbin
+vi run.sh
+1
+2
+脚本内容
+
+#!/bin/bash
+/usr/sbin/sshd &
+/usr/local/apache2/bin/httpd -D FOREGROUND
+1
+2
+3
+改变脚本权限，使其可以运行
+
+chmod 755 run.sh
+1
+七、创建带有apache和ssh服务的镜像 
+1、查看当前容器的 CONTAINER ID
+
+[root@localhost ~]# docker ps -a
+CONTAINER ID        IMAGE               COMMAND               CREATED                   STATUS                      PORTS                   NAMES
+66b4ab8dbdeb        sshd-centos         "/usr/sbin/sshd -D"   23 hours ago              Up 45 minutes               0.0.0.0:10022->22/tcp   trusting_morse
+1
+2
+3
+2、根据容器CONTAINER ID生成新的镜像
+
+docker commit 66b4ab8dbdeb apache:centos
+1
+3、查看新生成的镜像
+
+[root@localhost ~]# docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED              VIRTUAL SIZE
+apache              centos              31668185b8f1        About a minute ago   433.4 MB
+sshd-centos         latest              64136bdc0cc8        23 hours ago         261.8 MB
+centos              latest              0f73ae75014f        5 weeks ago          172.3 MB
+1
+2
+3
+4
+5
+6
+八、根据新生成的镜像生成容器 
+分别映射容器的22端口和80端口到宿主机的2222端口和8000端口
+
+docker run -d -p 2222:22 -p 8000:80 apache:centos /usr/local/sbin/run.sh
+1
+查看生成的容器：
+
+[root@localhost ~]# docker ps -a
+CONTAINER ID        IMAGE               COMMAND                CREATED             STATUS                      PORTS                                        NAMES
+7a9021c9b510        apache:centos       "/usr/local/sbin/run   4 minutes ago       Up 4 minutes                0.0.0.0:2222->22/tcp, 0.0.0.0:8000->80/tcp   tender_payne
+66b4ab8dbdeb        sshd-centos         "/usr/sbin/sshd -D"    23 hours ago        Up 57 minutes               0.0.0.0:10022->22/tcp                        trusting_morse
+6c40d0d2d8be        centos              "/bin/bash"            23 hours ago        Exited (137) 23 hours ago                                                centos-ssh
+1
+2
+3
+4
+5
+6
+测试apache服务：
+
+[root@localhost ~]# curl localhost:8000
+<html><body><h1>It works!</h1></body></html>
+1
+2
+测试ssh服务
+
+[root@localhost ~]#ssh localhost -p 2222
+root@localhost's password:
+Last login: Tue Oct 13 14:20:41 2015 from 172.17.42.1
+[root@7a9021c9b510 ~]#
+1
+2
+3
+4
+测试通过！ 
+九、映射宿主机目录 
+将宿主机的/www目录映射到容器的/usr/local/apache2/htdocs目录 
+1、在宿主机上新建目录并建立主页文件
+
+mkdir /www
+cd /www
+vi index.html
+1
+2
+3
+代码如下:
+
+<html><body><h1>It's test!</h1></body></html>
+1
+为了区别于之前生成的8000端口的容器的默认主页内容，我将“It works” 改为 “It’s test”. 
+2、生成新的窗口
+
+docker run -d -p 2223:22 -p 8001:80 -v /www:/usr/local/apache2/htdocs:ro apache:centos /usr/local/sbin/run.sh
+1
+2
+分别映射容器的22端口和80端口到宿主机的2223端口和8001端口； 
+通过-v 参数将/www映射到/usr/local/apache2/htdocs，同时出于安全性和隔离性的考虑加上ro只读参数 
+查看生成的容器：
+
+[root@localhost www]# docker ps -a
+CONTAINER ID        IMAGE               COMMAND                CREATED             STATUS                      PORTS                                        NAMES
+bd8335195b44        apache:centos       "/usr/local/sbin/run   9 minutes ago       Up 9 minutes                0.0.0.0:2223->22/tcp, 0.0.0.0:8001->80/tcp   cranky_nobel
+7a9021c9b510        apache:centos       "/usr/local/sbin/run   21 minutes ago      Up 21 minutes               0.0.0.0:2222->22/tcp, 0.0.0.0:8000->80/tcp   tender_payne
+66b4ab8dbdeb        sshd-centos         "/usr/sbin/sshd -D"    23 hours ago        Up About an hour            0.0.0.0:10022->22/tcp                        trusting_morse
+6c40d0d2d8be        centos              "/bin/bash"            24 hours ago        Exited (137) 23 hours ago                                                centos-ssh
+1
+2
+3
+4
+5
+6
+7
+测试：
+
+[root@localhost www]# curl localhost:8001
+<html><body><h1>It's test!</h1></body></html>
+
+[root@localhost www]# curl localhost:8000
+<html><body><h1>It works!</h1></body></html>

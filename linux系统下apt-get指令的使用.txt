@@ -1,0 +1,31 @@
+apt-get 是linux的一条指令，主流的linux版本Debian和ubuntu都使用apt-get来安装软件。那么，需安装的软件都放在哪里呢？？？
+
+apt-get 利用软件安装源来安装软件，其软件安装源放置在/etc/apt/sources.list文件中。也就是说，当我们使用apt-get install来安装某个软件时，系统会通过这个文件上的软件安装源去对应的地址上去找，所以如果是软件安装源地址不是本地的，那么就需要联网才能完成安装。如果默认的软件安装源没有需要安装的软件，就无法安装成功。
+
+在/etc/apt/sources.list文件内，我们也可以设置自己的软件安装源，但修改了软件安装源后，必须执行apt-get update才能生效。例如指向光盘内的软件来安装某个软件，这时就不需要联网。
+
+以下演示利用apt-get对某个软件经行操作（以nginx-full为例）
+
+sudo apt-get install nginx-full   安装软件
+
+sudo apt-get remove nginx-full   卸载软件，软件不可用，但保留软件配置文件  
+
+sudo apt-get remove --purge nginx-full   卸载软件，软件不可用，同时删除软件配置文件 
+
+sudo apt-get autoremove nginx-full   卸载软件及依赖nginx-full的软件包(nginx-common)，软件不可用，但保留软件配置文件 
+
+sudo apt-get autoremove --purge nginx-full   卸载软件及被依赖的软件包(nginx-common)，软件不可用，同时删除软件配置文件
+
+apt默认会把已安装和已卸载的软件都备份起来，如果用不到，无疑是占用了硬盘空间，使用以下指令可以清除：
+
+sudo apt-get autoclean    清除已卸载软件的备份
+
+sudo apt-get clean    清除已安装软件的备份
+
+sudo apt-get update   同步软件源，这样才能获得最新的软件包。
+
+sudo apt-get upgrade   更新已安装的软件，更新之后的版本就是本地索引的，所以upgrade之前一定要执行update，才是最新的
+
+apt-cache search string   搜索字符串
+
+dpkg -L nginx-full   查看软件文档安装的位置

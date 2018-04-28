@@ -1,0 +1,104 @@
+mysql 根据一张表数据更新另一张表
+
+
+sql示例
+update a  ,b
+ set
+ a.name = b.name
+ where  a.id = b.id
+
+一）在同一个数据库服务器上面进行数据表间的数据导入导出：
+
+
+1. 如果表tb1和tb2的结构是完全一样的，则使用以下的命令就可以将表tb1中的数据导入到表tb2中：
+
+insert into db2.tb2 select * from  db1.tb1
+
+
+2. 如果表tb1和tb2只有部分字段是相同的，要实现将tb1中的部分字段导入到tb2中相对应的相同字段中，则使用以下命令：
+
+insert into db2.tb2(字段1，字段2，字段3……) select  字段1‘，字段2’，字段3‘，……  from db1.tb1;
+
+
+
+二）但是要实现将远程数据库中数据表tb1的数据导入到本地数据库数据表tb2中，并没有太好的方法像以上例子所示的在本地直接使用SQL语句就能搞定。这时就要使用到数据库（表）的导出，导入。即将远程的数据库（表）导出到本地文件中，然后再将该数据库（表）导入（还原）到本地数据库中。这些方法多应用于数据库的备份和还原中
+
+
+1.远程数据库（表）导出到本地数据库（表）文件
+
+（1）导出数据库
+
+mysqldump -h192.168.1.1 -uroot -p123456 --databases mydb > mydb.bak;      //将192.168.1.1主机上的mydb数据库导出到本地的mydb.bak文件中
+
+（mysqldump  -uroot -p123456 --databases mydb1 > mydb1.bak;                        //将本地mysql服务器上的mydb1数据库导出到本地的mydb1.bak文件中）
+
+（2）导出数据表
+
+mysqldump -h192.168.1.1 -uroot -p123456 mydb tb1 > tb1.bak;                       //将192.168.1.1主机上的mydb数据库的tb1数据表导出到本地的tb1.bak文件中
+
+（mysqldump  -uroot -p123456 mydb1 tb2 > tb2.bak;                                      //将本地主机上的mydb1数据库的tb2数据表导出到本地的tb2.bak文件中）
+
+
+2. 导入数据库（表）
+
+（1）导入数据库
+
+在本地数据库中创建相对应导出的数据库mydb同名的数据库：
+
+mysql> create database mydb;
+
+然后退出数据库，再使用以下的 命令导入数据库文件mydb.bak到本地数据库mydb中：
+
+mysql -uroot -p123456 mydb < /root/data/mydb.bak;
+
+
+或者进入mysql中，使用sourc指令完成数据库导入，如下：
+
+mysql> source  /root/data/mydb.bak;                                          // /root/data/mydb.bak是远程数据库mydb导出文件的本地存放位置
+
+
+（2）导入数据表
+
+在本地数据库中创建相对应导出的数据库mydb同名的数据库：
+
+mysql> create database mydb;
+
+然后在mysql中使用source指令来完成数据表的导入，如下：
+
+mysql> source /root/data/tb1.bak;                                               // /root/data/tb1.bak是远程数据表tb1导出文件的本地存放位置
+
+ 
+
+三） 导出表记录到文件
+
+mysql -hxxx.xxx.xxx.xxx -uroot -pxxxxxx -D WHOIS -e "select domain from domainInfo where queryFlag = '2' or queryFlag = '3'" >  /data/dump/overdue
+
+
+注意：在数据库（表）的导入、导出过程中，视数据库（表）的大小，需要一定的时间开销，请耐性等候……
+
+
+
+四）导入、导出数据表中的数据
+
+
+
+1. 导出表数据到文件中：
+mysql -uroot -p123456 --default-character-set=utf8
+use guanjia;
+select * from driver into outfile '/tmp/a.txt';
+
+(select * from crawlDocs order by DocCrawlTime desc limit 2000 into outfile '/tmp/weixinData' FIELDS TERMINATED BY ',';)
+一般最好是导出到/tmp目录下，因为这样mysql用户也可以写入。
+
+
+
+
+2. 表数据导入到数据表中：
+mysql -uroot -p123456 --default-character-set=utf8
+use guanjia;
+load data infile '/tmp/a.txt' into table test CHARACTER SET utf8;
+
+(load data infile '/tmp/weiData' into table crawlDocs CHARACTER SET utf8 FIELDS TERMINATED BY ',';)
+
+如果导入时出现类似 ERROR 29 (HY000): File '/tmp/a.txt' not found (Errcode: 13)的错误，则很可能是因为mysql用户没有权限访问该文件，
+则使用 chown mysql:mysql /tmp/a.txt 将该文件的所属设为mysql用户，再次执行上面的命令则一般可以完成导入。

@@ -1,0 +1,773 @@
+描述：
+架构方案： mysql （master/slave） --gtid 方式主备（pos 也可）
+mycat （master/slave） --xinted 插件时间主备模式
+haproxy （master/slave） --keepalived 自动切换
+
+
+
+--keepalived和haproxy必须装在同一台机器上, keepalived负责为该服务器抢占vip（虚拟ip），抢占到vip后，对该主机的访问可以通过原来的ip（10.118.242..214）访问，也可以直接通过vip（10.118.242..212）访问。
+--10.118.242..214上的keepalived也会去抢占vip，抢占vip时有优先级，配置keepalived.conf中的（priority 150 #数值愈大，优先级越高,10.118.242..216上改为120，master和slave上该值配置不同）决 定。但是一般哪台主机上的keepalived服务先启动就会抢占到vip，即使是slave，只要先启动也能抢到。
+--haproxy负责将对vip的请求分发到mycat上。起到负载均衡的作用，同时haproxy也能检测到mycat是否存活，haproxy只会将请求转发到存活的mycat上。
+--如果一台服务器（keepalived+haproxy服务器）宕机，另外一台上的keepalived会立刻抢占vip并接管服务。
+--如果一台mycat服务器宕机，haporxy转发时不会转发到宕机的mycat上，所以mycat依然可用.
+
+
+MyCAT 后面，连接的是MYSQL 数据库，这里为 ： A/B复制模式。
+Haproxy + keepalived 安装在同一主机上。
+mycat+xinted 安装在同一主机上。
+
+
+版本： OS : redhat6.4 x86 64bit
+Mysql : 5.7.15
+Mycat :server-1.5.1-RELEASE
+Haproxy : haproxy-1.6.2.tar.gz
+keepalived : keepalived-1.2.16.tar.gz
+安装之前，最好把iptables ，selinux 关闭
+
+
+一： 配置本地yum 源，并安装 相应的依赖包 （这里我直接套用安装oracle依赖性包加载，一般oracle使用包，其他的软件都会包含。）
+二： 安装MYSQL 数据
+(5.7 版本之前，可以使用系统root 启用，5.7之后，被限制了，也更加考虑到了其安全性）
+注意： 1，mysql 开始安装时，mysql_install_db
+由5.6之前的在scripts 转移至 bin 目录下。
+2，初次进入 mysql 库需要 输入初始密码，路径在 /home/mysql/下：
+        [mysql@martinli02 mysql-5.7.10]$ cat /home/mysql/.mysql_secret 
+        # Password set for user 'root@localhost' at 2015-12-27 23:17:57 
+        .hyMlk?!b6M!
+3， 登陆后，必须要修改密码 mysql> set password=password('xxxxx');
+mysql> flush privileges;
+三： MYSQL master/slave 配置
+---参考 MYSQL 同步复制
+----设置参数，自动提交 autocommit = 1 (否然，mycat 插入时，没数据显示)
+
+
+四： Mycat 安装配置
+--这里，mycat 我主要用其实现 读写分离，未做分库分表设置，所以，
+只涉及 
+schema.xml, server.xml 文件的修改。
+--Mysql 主节点 使用 innodb 引擎， 备节点 使用myisam 引擎。
+
+
+# useradd -m -u 1201 -g mysql mycat
+# tar -xvf Mycat-server-1.5.1-RELEASE-20160816173057-linux.tar.gz -C /usr/local/
+# cd /usr/local/mycat
+[root@mysql01 mycat]# ls
+bin catlet conf lib logs version.txt --解压出来后，就前5个目录
+[root@mysql01 mycat]# cd conf/
+[root@mysql01 conf]# ls
+autopartition-long.txt
+log4j.xml rule.xml
+server.xml
+cacheservice.properties myid.properties schema.xml wrapper.conf
+dnindex.properties partition-hash-int.txt sequence_conf.properties zk-create.yaml
+ehcache.xml
+partition-range-mod.txt sequence_db_conf.properties
+index_to_charset.properties
+router.xml sequence_time_conf.properties
+
+
+--配置schema.xml 参数--
+[root@mysql01 conf]# cat schema.xml
+<?xml version="1.0"?>
+<!DOCTYPE mycat:schema SYSTEM "schema.dtd">
+<mycat:schema xmlns:mycat="http://org.opencloudb/" >
+
+
+
+
+<!-- ############## Add configure information ############ -->
+<schema name="mongodb" checkSQLschema="false" sqlMaxLimit="100" dataNode="dn1">
+</schema>
+<schema name="redis" checkSQLschema="false" sqlMaxLimit="100" dataNode="dn2">
+</schema>
+<schema name="test" checkSQLschema="false" sqlMaxLimit="100" dataNode="dn3">
+</schema>
+<schema name="scout" checkSQLschema="false" sqlMaxLimit="100" dataNode="dn4">
+</schema>
+
+
+<dataNode name="dn1" dataHost="MysqlA-B" database="mongodb" />
+<dataNode name="dn2" dataHost="MysqlA-B" database="redis" />
+<dataNode name="dn3" dataHost="MysqlA-B" database="test" />
+<dataNode name="dn4" dataHost="MysqlA-B" database="scout" />
+
+
+<dataHost name="MysqlA-B" maxCon="1000" minCon="10" balance="3" writeType="0" dbType="mysql" dbDriver="native" switchType="2" slaveThreshold="100">
+<heartbeat>select user()</heartbeat>
+<!-- can have multi write hosts -->
+<writeHost host="10.118.242.215" url="10.118.242.215:3308" user="root" password="mysql123">
+<!-- can have multi read hosts -->
+<readHost host="10.118.242.216" url="10.118.242.216:3308" user="query" password="query123">
+</readHost>
+</writeHost>
+</dataHost> 
+</mycat:schema>
+
+
+-- server.xml 配置参数 --
+[root@mysql01 conf]# cat server.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- - - Licensed under the Apache License, Version 2.0 (the "License");
+- you may not use this file except in compliance with the License. - You
+may obtain a copy of the License at - - http://www.apache.org/licenses/LICENSE-2.0
+- - Unless required by applicable law or agreed to in writing, software -
+distributed under the License is distributed on an "AS IS" BASIS, - WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. - See the License for the specific language governing permissions and - limitations under the License. -->
+
+
+<!DOCTYPE mycat:server SYSTEM "server.dtd">
+<mycat:server xmlns:mycat="http://org.opencloudb/">
+<system>
+<property name="defaultSqlParser">druidparser</property>
+
+
+
+
+<!-- ########### add configure server port ########## -->
+<property name="serverPort">8066</property> <!-- 管理Port -->
+<property name="managerPort">9066</property> <!-- 服务Port -->
+<property name="processors">4</property> <!-- CPU使用数 -->
+<property name="processorExecutor">64</property> <!-- 线程池 -->
+<property name="processorBufferChunk">8192</property> <!-- 分配SocketDirectBuffer的大小 -->
+<property name="useCompression">1</property> <!--1为开启mysql压缩协议-->
+<property name="sequnceHandlerType">1</property>
+<!--Mycat全局序列的类型,0为本地文件方式,1为数据库方式 -->
+<property name="packetHeaderSize">4</property>
+<property name="maxPacketSize">163840</property>
+<property name="idleTimeout">1200</property>
+<property name="charset">utf8</property>
+<!--property name="txIsolation">READ-COMMITTED</property-->
+<property name="sqlExecuteTimeout">900</property>
+</system>
+<user name="root">
+<property name="password">mysql123</property>
+<property name="schemas">mongodb,redis,test,scout</property>
+</user>
+
+
+<user name="query">
+<property name="password">query123</property>
+<property name="readOnly">true</property>
+<property name="schemas">mongodb,redis,test,scout</property>
+</user>
+</mycat:server>
+--这里，最新版本可以支持密文，无需明文，这里为了方便。
+
+
+五， 配置xinetd 服务及参数：
+在mycat 1,mycat2 上都需添加检测端口48700的脚本，为此需要用到xinetd, xinetd 为linux 系统基础服务， 主要用来监听MYCAT 是否存活。
+yum install xinted*
+在： /etc/xinted.d/ 及 /usr/local/bin/xinted 下查看配置文件：
+--第一种安装方式：
+我这里通过第二种方式安装：
+tar -xvf xinetd-2.3.15.tar.gz -C /usr/local/
+[root@mysql01 ~]# cd /usr/local/xinetd-2.3.15/
+[root@mysql01 xinetd-2.3.15]# ls
+aclocal.m4 config.guess config.log configure COPYRIGHT libs README xinetd.spec AUDIT config.h config.status configure.in INSTALL Makefile TODO xinetd.spec.in CHANGELOG config.h.in config.sub
+ contrib install-sh Makefile.in xinetd
+
+
+[root@mysql01 xinetd-2.3.15]# cd contrib/
+[root@mysql01 contrib]# ls
+empty.conf mycat_monitor.sh xinetd xinetd.conf xinetd.d
+[root@mysql01 contrib]# tail -12 xinetd.conf
+groups = yes
+umask = 002
+
+
+# Generally, banners are not used. This sets up their global defaults
+#
+# banner =
+# banner_fail =
+# banner_success =
+}
+
+
+includedir /usr/local/xinetd-2.3.15/contrib/xinetd.d --主要修改这里
+-- /usr/local/xinetd-2.3.15/contrib/xinetd.d/mycat_status --服务参数路径
+
+
+mycat_status
+此配置主要是用来监听mycat是否存活的配置
+[root@mysql01 contrib]# cat xinetd.d/mycat_status
+service mycat_status
+{
+flags = REUSE
+socket_type = stream
+port = 48700
+wait = no
+user = root
+server =/usr/local/xinetd-2.3.15/contrib/mycat_monitor.sh
+log_on_failure += USERID
+disable = no
+}
+
+
+[root@mycat01 xinetd.d]# pwd
+/usr/local/xinetd-2.3.15/contrib/xinetd.d
+[root@mycat01 xinetd.d]# cd ../
+[root@mycat01 contrib]# ls
+empty.conf 
+mycat_monitor.sh xinetd xinetd.conf xinetd.d
+
+
+--mycat_monitor.sh 此配置主要是用来监听mycat是否存活的脚本
+[root@mysql01 contrib]# cat mycat_monitor.sh
+#!/bin/bash
+#/usr/local/bin/mycat_status.sh
+# This script checks if a mycat server is healthy running on localhost. It will
+# return:
+#
+# "HTTP/1.x 200 OK\r" (if mycat is running smoothly)
+#
+# "HTTP/1.x 503 Internal Server Error\r" (else)
+mycat=`/usr/local/mycat/bin/mycat status |grep 'not running'| wc -l`
+if [ "$mycat" = "0" ];
+then
+/bin/echo -e "HTTP/1.1 200 OK\r\n"
+else
+/bin/echo -e "HTTP/1.1 503 Service Unavailable\r\n"
+fi
+
+
+
+
+4、/etc/services中加入mycat_status服务 --添加进入后，启动才有效。
+加入mycat_status服务，
+cd /etc
+vi services
+在末尾加入以下内容：
+mycat_status 48700/tcp # mycat_status
+保存
+重启xinetd服务
+service xinetd restart
+
+
+############
+[root@mycat01 xinetd]# pwd
+/usr/local/xinetd-2.3.15/xinetd
+
+
+--xinetd 启动，停止脚本
+--启动脚本：
+#!/bin/bash
+/usr/local/xinetd-2.3.15/xinetd/xinetd -f /usr/local/xinetd-2.3.15/contrib/xinetd.d/mycat_status &
+
+
+--停止脚本：
+#!/bin/bash
+ps -ef |grep xinetd |grep -v grep |awk '{print $2}'|xargs kill -s 9
+---------------
+启动mysql
+启动xinted ， 启动mycat 
+----------------
+
+
+六， 安装keepalived
+--openssl 安装：
+openssl 必须先于 keepalive 先安装， 否则安装keepalive时有可能报错，keepalived 依赖openssl.
+
+
+yum install gcc* cc*
+安装openssl-devel
+yum install openssl-devel -y #如无法yum下载安装，请修改yum配置文件
+
+
+--通过rpm 包安装：
+mkdir -pv /usr/local/openssl/
+tar -xvf xxxxx.gz -C /usr/local/
+cd /usr/local/openssl-1.0.1l/
+./config --prefix=/usr/local/openssl/
+make 
+make test
+make install
+ln -s /usr/local/openssl /usr/local/ssl
+
+
+----openssl配置----
+vi /etc/ld.so.conf
+
+
+在/etc/ld.so.conf文件的最后面，添加如下内容：
+/usr/local/openssl/lib
+vi /etc/profile
+内容如下：
+export OPENSSL=/usr/local/openssl/bin
+export PATH=$PATH:$OPENSSL
+
+
+执行以下语句是环境变量生效：
+source /etc/profile
+测试:
+cd /usr/local/openssl/
+[root@host-10-118-220-136 openssl]# ls
+bin include lib ssl
+[root@host-10-118-220-136 openssl]# cd bin/
+[root@host-10-118-220-136 bin]# ls
+c_rehash openssl
+[root@host-10-118-220-136 bin]# ldd openssl
+linux-vdso.so.1 => (0x00007fff0ba32000)
+libdl.so.2 => /lib64/libdl.so.2 (0x0000003883200000)
+libc.so.6 => /lib64/libc.so.6 (0x0000003882e00000)
+/lib64/ld-linux-x86-64.so.2 (0x0000003882a00000)
+[root@host-10-118-220-136 bin]# pwd
+/usr/local/openssl/bin
+
+
+[root@host-10-118-220-136 bin]# which openssl
+/usr/bin/openssl
+[root@host-10-118-220-136 bin]# openssl version
+OpenSSL 1.0.1l 15 Jan 2015
+[root@host-10-118-220-136 bin]#
+----在这里，只要keepalive 编辑安装时不抱错，就可以了。不管openssl 是否真成功。
+
+
+--keepalived安装：
+tar -xvf keepalived-1.2.16.tar.gz -C /usr/local/
+cd /usr/local/keepalived-1.2.16/
+./configure
+make && make install
+如果 keepalived 安装 报错:
+安装keepalive错误：configure: error: No SO_MARK
+下面加个参数，禁用fwmark
+[root@gw keepalived-1.2.16]# ./configure --disable-fwmark
+[root@host-10-118-220-136 etc]# cp /usr/local/etc/rc.d/init.d/keepalived /etc/rc.d/init.d/
+[root@host-10-118-220-136 etc]# cp /usr/local/etc/sysconfig/keepalived /etc/sysconfig/
+[root@host-10-118-220-136 etc]# cp /usr/local/keepalived-1.2.16/keepalived/etc/keepalived/keepalived.conf /etc/keepalived/
+[root@host-10-118-220-136 etc]# cp /usr/local/sbin/keepalived /usr/sbin/
+
+
+--keepalived 配置参数：
+[root@mysql03 keepalived]# pwd
+/usr/local/keepalived-1.2.16/keepalived/etc/keepalived
+[root@mysql03 keepalived]# cat keepalived.conf --主配置
+! Configuration File for keepalived
+vrrp_script chk_http_port
+{
+script "/etc/keepalived/scripts/check_haproxy.sh"
+interval 2
+weight 2
+}
+vrrp_instance VI_1
+{
+state 
+MASTER （主为MASTER 备为BACKUP）
+interface eth0
+virtual_router_id 51
+priority 
+150
+advert_int 1
+authentication {
+auth_type PASS
+auth_pass 1234
+}
+track_script {
+chk_http_port
+}
+virtual_ipaddress
+{
+10.118.242.212 dev eth0 scope global -- 虚拟
+10.118.242.211 dev eth0 scope global
+}
+
+
+notify_master /etc/keepalived/scripts/haproxy_master.sh
+notify_backup /etc/keepalived/scripts/haproxy_backup.sh
+notify_fault /etc/keepalived/scripts/haproxy_fault.sh
+notify_stop /etc/keepalived/scripts/haproxy_stop.sh
+}
+
+
+[root@mysql03 keepalived]# cat keepalived.conf --备配置
+! Configuration File for keepalived
+vrrp_script chk_http_port
+{
+script "/etc/keepalived/scripts/check_haproxy.sh"
+interval 2
+weight 2
+}
+vrrp_instance VI_1
+{
+state 
+BACKUP （主为MASTER 备为BACKUP）
+interface 
+eth0 --#对外提供服务的网络接口
+virtual_router_id
+51 --#VRRP组名，两个节点的设置必须一样，以指明各个节点属于同一VRRP组
+priority 
+120
+advert_int 1
+authentication {
+auth_type PASS
+auth_pass 1234
+}
+track_script {
+chk_http_port --#调用脚本check_haproxy.sh检查haproxy是否存活
+}
+virtual_ipaddress
+{
+10.118.242.212 dev eth0 scope global --这ip必须与我们在lvs客户端设定的vip相一致
+10.118.242.211 dev eth0 scope global
+}
+
+
+notify_master /etc/keepalived/scripts/haproxy_master.sh
+notify_backup /etc/keepalived/scripts/haproxy_backup.sh
+notify_fault /etc/keepalived/scripts/haproxy_fault.sh
+notify_stop /etc/keepalived/scripts/haproxy_stop.sh
+}
+-----------------------------------
+1. virtual_router_id 51 这个代表一个集群组，如果同一个网段还有另一组集群，请使用不同的组编号区分。如换成52、53等。
+2. interface eth1 和172.17.210.103 dev eth1 scope global中的eth1指的是网卡，如果是多网卡，可能会有eth0，eth1，eth2…，可以使用ifconfig命令查看，确保eth0是本机存在的网卡地址。有些服务器如果只有一个网卡，但被人为把eth0改成eth1了，你再写eth0就找不到了的。
+-----------------------------------
+
+
+[root@mysql03 scripts]# cat check_haproxy.sh
+#!/bin/bash
+STARTHAPROXY="/usr/local/haproxy/sbin/haproxy -f /usr/local/haproxy/haproxy.cfg"
+STOPKEEPALIVED="/etc/init.d/keepalived stop"
+LOGFILE="/usr/local/keepalived/var/log/keepalived-haproxy-state.log"
+echo "[check_haproxy status]" >> $LOGFILE
+A=`ps-C haproxy --no-header |wc-l`
+echo "[check_haproxy status]" >> $LOGFILE
+date >> $LOGFILE
+if [ $A -eq 0 ];then
+echo $STARTHAPROXY >> $LOGFILE
+$STARTHAPROXY >> $LOGFILE 2>&1
+sleep5
+fi
+if [ `ps -C haproxy --no-header |wc-l` -eq0 ];then
+exit 0
+else
+exit 1
+fi
+-----------------------
+粗体check_haproxy.sh
+vi /etc/keepalived/scripts/check_haproxy.sh
+脚本含义：如果没有haproxy进程存在，就启动haproxy，停止keepalived
+check_haproxy.sh
+
+
+[root@mysql03 scripts]# cat haproxy_master.sh (主备一样）
+#!/bin/bash
+STARTHAPROXY=`/usr/local/haproxy/sbin/haproxy-f/usr/local/haproxy/haproxy.cfg`
+STOPHAPROXY=`ps-ef |grep sbin/haproxy| grep -vgrep|awk'{print $2}'|xargskill-s 9`
+LOGFILE="/usr/local/keepalived/var/log/keepalived-haproxy-state.log"
+echo "[master]" >> $LOGFILE
+date >> $LOGFILE
+echo "Being master...." >> $LOGFILE 2>&1
+echo "stop haproxy...." >> $LOGFILE 2>&1
+$STOPHAPROXY >> $LOGFILE 2>&1
+echo "start haproxy...." >> $LOGFILE 2>&1
+$STARTHAPROXY >> $LOGFILE 2>&1
+echo "haproxy stared ..." >> $LOGFILE
+[root@mysql03 scripts]# cat haproxy_fault.sh (主备一样）
+#!/bin/bash
+LOGFILE=/usr/local/keepalived/var/log/keepalived-haproxy-state.log
+echo "[fault]" >> $LOGFILE
+date >> $LOGFILE
+[root@mysql03 scripts]# cat haproxy_stop.sh (主备一样）
+#!/bin/bash
+LOGFILE=/usr/local/keepalived/var/log/keepalived-haproxy-state.log
+echo "[stop]" >> $LOGFILE
+date >> $LOGFILE
+
+
+--启动keepalived:
+[root@mysql03 keepalived-1.2.16]# /etc/init.d/keepalived restart
+Stopping keepalived: [FAILED]
+Starting keepalived: [ OK ]
+
+
+-- 测试验证
+[root@mysql03 scripts]# ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 16436 qdisc noqueue state UNKNOWN
+link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+inet 127.0.0.1/8 scope host lo
+inet6 ::1/128 scope host
+valid_lft forever preferred_lft forever
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UNKNOWN qlen 1000
+link/ether 00:50:56:aa:54:86 brd ff:ff:ff:ff:ff:ff
+inet 10.118.242.214/24 brd 10.118.242.255 scope global eth0
+inet 10.118.242.212/32 scope global eth0
+inet6 fe80::250:56ff:feaa:5486/64 scope link
+valid_lft forever preferred_lft forever
+
+
+七： haproxy 安装配置
+# tar xf haproxy-1.4.25.tar.gz -C /usr/local/
+# cd haproxy-1.4.25
+# --查看版本号（os-kener）
+# make TARGET=linux26 PREFIX=/usr/local/haproxy install
+注：TARGET后面根据本机操作系统内核版本来填写
+创建配置文件目录，日志目录，并根据需求编写配置文件
+# mkdir /usr/local/haproxy/{conf,logs}
+# vim /usr/local/haproxy/conf/haproxy.cfg
+配置 参数，主备一样：
+[root@mysql03 conf]# cat haproxy.cfg
+global
+log 127.0.0.1 local0
+maxconn 4096
+chroot /usr/local/haproxy
+user mysql 
+group mysql
+daemon
+quiet
+nbproc 1
+pidfile /usr/local/haproxy/logs/haproxy.pid
+defaults
+log global
+option dontlognull
+retries 3
+option httplog
+option redispatch
+maxconn 3000
+contimeout 50000
+clitimeout 50000
+srvtimeout 50000
+listen admin_stats
+bind 10.118.242.212:48800
+stats uri /admin-status
+stats auth admin:admin
+mode http
+option httplog
+listen allmycat_service
+bind 10.118.242.212:8096
+mode tcp
+option tcplog
+option httpchk OPTION * HTTP/1.1\r\nHost:\ www
+balance roundrobin
+server mycat_209 10.118.242.209:8066 check port 48700 inter 5s rise 2 fall 3
+server mycat_210 10.118.242.210:8066 check port 48700 inter 5s rise 2 fall 3
+srvtimeout 20000
+listen allmycat_admin
+bind 10.118.242.212:8097
+mode tcp
+option tcplog
+option httpchk OPTIONS * HTTP/1.1\r\nHost:\ www
+balance roundrobin
+server mycat_209 10.118.242.209:9066 check port 48700 inter 5s rise 2 fall 3
+server mycat_210 10.118.242.210:9066 check port 48700 inter 5s rise 2 fall 3
+srvtimeout 20000
+---------------------------
+bind 10.118.242.212:8096 对应的是mycat 8066 端口，
+bind 10.118.242.212:8097 对应的是mycat 9066 端口。 （需要和mycat 一致）
+server 为 mycat 两台主机
+----------------------------
+
+
+配置haproxy 日志记录方式：
+yum install rsyslog -y
+--默认haproxy 是不记录日志的，为了记录日志还需要配置syslog 模块，在Linux下rsyslogd服务
+--先安装rsyslog
+cd /etc/rsyslog.d/ --如果没有此目录，需新创建。
+[root@mysql03 conf]# cd /etc/rsyslog.d/
+[root@mysql03 rsyslog.d]# ls
+haproxy.conf
+[root@mysql03 rsyslog.d]# cat haproxy.conf --添加内容
+$ModLoad imudp
+$UDPServerRun 514
+local0.* /var/log/haproxy.log
+
+
+[root@mysql03 rsyslog.d]# pwd
+/etc/rsyslog.d --添加
+在#### RULES ####上面一行的地方加入以下内容：
+# Include all config files in /etc/rsyslog.d/
+$IncludeConfig /etc/rsyslog.d/*.conf
+#### RULES ####
+在local7.* /var/log/boot.log的下面加入以下内容（增加后的效果如下）：
+local0.* /var/log/haproxy.log
+
+
+启动rsyslog 服务
+--立马在/var/log/有 harporxy.log 了。
+[root@mysql03 rsyslog.d]# cd /var/log/
+[root@mysql03 log]# ll haproxy.log
+-rw-------. 1 root root 5160 Nov 15 16:49 haproxy.log
+
+
+启动 haproxy：
+# /usr/local/haproxy/sbin/haproxy -c /usr/local/haproxy/conf/haproxy.cfg
+---------
+[root@mysql03 log]# netstat -nltp
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address Foreign Address State PID/Program name
+tcp 0 0 0.0.0.0:111 0.0.0.0:* LISTEN 1381/rpcbind
+tcp 0 0 0.0.0.0:22 0.0.0.0:* LISTEN 1676/sshd
+tcp 0 0 127.0.0.1:631 0.0.0.0:* LISTEN 1545/cupsd
+tcp 0 0 127.0.0.1:25 0.0.0.0:* LISTEN 1752/master
+tcp 0 0 127.0.0.1:6010 0.0.0.0:* LISTEN 6278/sshd
+tcp 0 0 127.0.0.1:6011 0.0.0.0:* LISTEN 6387/sshd
+tcp 0 0 127.0.0.1:6012 0.0.0.0:* LISTEN 24216/sshd
+tcp 0 0 10.118.242.212:8096 0.0.0.0:* LISTEN 16997/haproxy
+tcp 0 0 10.118.242.212:48800 0.0.0.0:* LISTEN 16997/haproxy
+tcp 0 0 10.118.242.212:8097 0.0.0.0:* LISTEN 16997/haproxy
+tcp 0 0 0.0.0.0:56457 0.0.0.0:* LISTEN 1399/rpc.statd
+
+
+通过本地MYSQL 工具调试：
+MYSQL IP + 端口 可以连接
+MYCAT IP + 端口 也可以连接
+HAPORXY(VIP) + 端口 也可以连接
+
+
+
+通过 url 地址 可以看见 haproxy 调度 界面： http://10.118.242.212:48800
+账号密码 admin/admin
+
+
+
+
+
+
+
+
+
+
+
+-------- THE END -------
+
+
+-----报错处理：
+[root@mysql01 sbin]# /usr/local/haproxy-1.6.2/sbin/haproxy -f /usr/local/haproxy-1.6.2/conf/haproxy.cfg &
+[1] 6783
+[root@mysql01 sbin]# [ALERT] 293/121421 (6783) : parsing [/usr/local/haproxy-1.6.2/conf/haproxy.cfg:21] : 'listen' cannot handle unexpected argument '10.118.242.211:48800'.
+[ALERT] 293/121421 (6783) : parsing [/usr/local/haproxy-1.6.2/conf/haproxy.cfg:21] : please use the 'bind' keyword for listening addresses.
+[ALERT] 293/121421 (6783) : parsing [/usr/local/haproxy-1.6.2/conf/haproxy.cfg:26] : 'listen' cannot handle unexpected argument '10.118.242.211:8098'.
+[ALERT] 293/121421 (6783) : parsing [/usr/local/haproxy-1.6.2/conf/haproxy.cfg:26] : please use the 'bind' keyword for listening addresses.
+[ALERT] 293/121421 (6783) : Error(s) found in configuration file : /usr/local/haproxy-1.6.2/conf/haproxy.cfg
+[ALERT] 293/121421 (6783) : Fatal errors found in configuration.
+
+
+--这里的：[/usr/local/haproxy-1.6.2/conf/haproxy.cfg:21] : 'listen' cannot handle unexpected argument '10.118.242.211:48800'.
+是因为写法错误：
+--------------------
+
+
+[root@mysql02 sbin]# /usr/local/haproxy-1.6.2/sbin/haproxy -f /usr/local/haproxy-1.6.2/conf/haproxy.cfg
+[ALERT] 293/151834 (20139) : Starting proxy admin_stats: cannot bind socket [10.118.242.211:48800]
+[ALERT] 293/151834 (20139) : Starting proxy allmycat_service: cannot bind socket [10.118.242.211:8098]
+--这里报错需要修改/etc/sysctl.conf 参数
+[ALERT] 164/110030 (11606) : Starting proxy linuxyw.com: cannot bind socket
+
+
+这个问题，其实就是因为你的haproxy没有得到VIP的原因，而你的配置文件又绑定了VIP地址，所以会提示以上错误 当然，你也要确保你的haproxy服务器做了hearbeat或keepalived，绑定VIP，要不就无法高可用了。
+
+
+解决方法：
+修改内核参数： /etc/sysctl.conf
+net.ipv4.ip_nonlocal_bind=1
+保存结果，使结果生效
+sysctl –p
+或者使用echo进去，前提是sysctl.conf文件中没有本条参数：
+echo 'net.ipv4.ip_nonlocal_bind = 1'>>/etc/sysctl.conf
+net.ipv4.ip_nonlocal_bind=1 意思是启动haproxy的时候，允许忽视VIP的存在
+
+
+
+
+传到各个机器
+
+
+for i in IP1 IP2 IP3 IP4
+do scp /etc/hosts $i:/etc;
+done
+
+
+--------MYSQL MY.CNF 配置参数------
+[client]
+user=martin
+password=88888888
+[mysqld]
+########basic settings########
+server-id= 11
+port = 3308
+user = mysql
+bind_address = 10.118.242.209
+autocommit = 1
+character_set_server=utf8mb4
+skip_name_resolve = 1
+max_connections = 800
+max_connect_errors = 1000
+datadir = /data/mysql_data
+transaction_isolation =
+READ-COMMITTED
+explicit_defaults_for_timestamp = 1
+join_buffer_size = 134217728
+tmp_table_size = 67108864
+tmpdir = /tmp
+max_allowed_packet = 16777216
+sql_mode ="STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER"
+interactive_timeout = 1800
+wait_timeout = 1800
+read_buffer_size = 16777216
+read_rnd_buffer_size = 33554432
+sort_buffer_size = 33554432
+########log settings########
+log_error = error.log
+slow_query_log = 1
+slow_query_log_file = slow.log
+log_queries_not_using_indexes = 1
+log_slow_admin_statements = 1
+log_slow_slave_statements = 1
+log_throttle_queries_not_using_indexes = 10
+expire_logs_days = 90
+long_query_time = 2
+min_examined_row_limit = 100
+########replication settings########
+master_info_repository = TABLE
+relay_log_info_repository = TABLE
+log_bin = bin.log
+sync_binlog = 1
+gtid_mode = on
+enforce_gtid_consistency = 1
+log_slave_updates
+binlog_format = row
+relay_log = relay.log
+relay_log_recovery = 1
+binlog_gtid_simple_recovery = 1
+slave_skip_errors = ddl_exist_errors
+########innodb settings########
+innodb_page_size = 8192
+innodb_buffer_pool_size = 6G
+innodb_buffer_pool_instances = 8
+innodb_buffer_pool_load_at_startup = 1
+innodb_buffer_pool_dump_at_shutdown = 1
+innodb_lru_scan_depth = 2000
+innodb_lock_wait_timeout = 5
+innodb_io_capacity = 4000
+innodb_io_capacity_max = 8000
+innodb_flush_method = O_DIRECT
+innodb_file_format = Barracuda
+innodb_file_format_max = Barracuda
+innodb_log_group_home_dir = /redolog/
+innodb_undo_directory = /undolog/
+innodb_undo_logs = 128
+innodb_undo_tablespaces = 3
+innodb_flush_neighbors = 1
+innodb_log_file_size = 4G
+innodb_log_buffer_size = 16777216
+innodb_purge_threads = 4
+innodb_large_prefix = 1
+innodb_thread_concurrency = 64
+innodb_print_all_deadlocks = 1
+innodb_strict_mode = 1
+innodb_sort_buffer_size = 67108864
+########semi sync replication settings########
+plugin_dir=/usr/local/mysql/lib/plugin
+plugin_load = "rpl_semi_sync_master=semisync_master.so;rpl_semi_sync_slave=semisync_slave.so"
+loose_rpl_semi_sync_master_enabled = 1
+loose_rpl_semi_sync_slave_enabled = 1
+loose_rpl_semi_sync_master_timeout = 5000
+[mysqld-5.7]
+innodb_buffer_pool_dump_pct = 40
+innodb_page_cleaners = 4
+innodb_undo_log_truncate = 1
+innodb_max_undo_log_size = 2G
+innodb_purge_rseg_truncate_frequency = 128
+
+
+log_timestamps=system
+transaction_write_set_extraction=MURMUR32
+show_compatibility_56=on

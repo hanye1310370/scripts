@@ -1,0 +1,223 @@
+MySQL批量更新数据
+
+ 2017-04-13 MySQL, PHP教程 发表评论
+目录
+1 常规方案
+2 高效方案
+2.1 CASE WHEN
+3.2 更新多值
+3.3 封装成PHP函数
+mysql更新语句很简单，更新一条数据的某个字段，一般这样写：
+
+ UPDATE mytable SET myfield = 'value' WHERE other_field = 'other_value';
+如果更新同一字段为同一个值，mysql也很简单，修改下where即可：
+
+UPDATE mytable SET myfield = 'value' WHERE other_field in ('other_values');
+这里注意，other_values是一个逗号，分隔的字符串，如：1,2,3
+
+1 常规方案
+那如果更新多条数据为不同的值，可能很多人会这样写：
+
+foreach ($display_order as $id => $ordinal) {
+    $sql = "UPDATE categories SET display_order = $ordinal WHERE id = $id";
+    mysql_query($sql);
+}
+即是循环一条一条的更新记录。
+
+一条记录update一次，这样性能很差，也很容易造成阻塞。
+
+2 高效方案
+那么能不能一条sql语句实现批量更新呢？
+
+2.1 CASE WHEN
+mysql并没有提供直接的方法来实现批量更新，但是可以用点小技巧来实现。
+
+UPDATE mytable SET
+    myfield = CASE id
+        WHEN 1 THEN 'value'
+        WHEN 2 THEN 'value'
+        WHEN 3 THEN 'value'
+    END
+WHERE id IN (1,2,3)
+这里使用了case when 这个小技巧来实现批量更新。
+
+举个例子：
+
+UPDATE categories SET
+    display_order = CASE id
+        WHEN 1 THEN 3
+        WHEN 2 THEN 4
+        WHEN 3 THEN 5
+    END
+WHERE id IN (1,2,3)
+这句sql的意思是，更新display_order 字段：
+
+如果id=1 则display_order 的值为3，
+如果id=2 则 display_order 的值为4，
+如果id=3 则 display_order 的值为5。
+即是将条件语句写在了一起。
+
+这里的where部分不影响代码的执行，但是会提高sql执行的效率。
+
+确保sql语句仅执行需要修改的行数，这里只有3条数据进行更新，而where子句确保只有3行数据执行。
+
+3.2 更新多值
+如果更新多个值的话，只需要稍加修改：
+
+UPDATE categories SET
+    display_order = CASE id
+        WHEN 1 THEN 3
+        WHEN 2 THEN 4
+        WHEN 3 THEN 5
+    END,
+    title = CASE id
+        WHEN 1 THEN 'New Title 1'
+        WHEN 2 THEN 'New Title 2'
+        WHEN 3 THEN 'New Title 3'
+    END
+WHERE id IN (1,2,3)
+到这里，已经完成一条mysql语句更新多条记录了。
+
+但是要在业务中运用，需要结合服务端语言。
+
+3.3 封装成PHP函数
+在PHP中，我们把这个功能封装成函数，以后直接调用。
+
+为提高可用性，我们考虑处理更全面的情况。
+
+如下时需要更新的数据，我们要根据id和parent_id字段更新post表的内容。
+
+其中，id的值会变，parent_id的值一样。
+
+$data = [
+    ['id' => 1, 'parent_id' => 100, 'title' => 'A', 'sort' => 1],
+    ['id' => 2, 'parent_id' => 100, 'title' => 'A', 'sort' => 3],
+    ['id' => 3, 'parent_id' => 100, 'title' => 'A', 'sort' => 5],
+    ['id' => 4, 'parent_id' => 100, 'title' => 'B', 'sort' => 7],
+    ['id' => 5, 'parent_id' => 101, 'title' => 'A', 'sort' => 9],
+];
+例如，我们想让parent_id为100、title为A的记录依据不同id批量更新：
+
+echo batchUpdate($data, 'id', ['parent_id' => 100, 'title' => 'A']);
+其中，batchUpdate()实现的PHP代码如下：
+
+/**
+ * 批量更新函数
+ * @param $data array 待更新的数据，二维数组格式
+ * @param array $params array 值相同的条件，键值对应的一维数组
+ * @param string $field string 值不同的条件，默认为id
+ * @return bool|string
+ */
+function batchUpdate($data, $field, $params = [])
+{
+   if (!is_array($data) || !$field || !is_array($params)) {
+      return false;
+   }
+
+    $updates = parseUpdate($data, $field);
+    $where = parseParams($params);
+
+    // 获取所有键名为$field列的值，值两边加上单引号，保存在$fields数组中
+    // array_column()函数需要PHP5.5.0+，如果小于这个版本，可以自己实现，
+    // 参考地址：http://php.net/manual/zh/function.array-column.php#118831
+    $fields = array_column($data, $field);
+    $fields = implode(',', array_map(function($value) {
+        return "'".$value."'";
+    }, $fields));
+
+    $sql = sprintf("UPDATE `%s` SET %s WHERE `%s` IN (%s) %s", 'post', $updates, $field, $fields, $where);
+
+   return $sql;
+}
+
+/**
+ * 将二维数组转换成CASE WHEN THEN的批量更新条件
+ * @param $data array 二维数组
+ * @param $field string 列名
+ * @return string sql语句
+ */
+function parseUpdate($data, $field)
+{
+    $sql = '';
+    $keys = array_keys(current($data));
+    foreach ($keys as $column) {
+
+        $sql .= sprintf("`%s` = CASE `%s` \n", $column, $field);
+        foreach ($data as $line) {
+            $sql .= sprintf("WHEN '%s' THEN '%s' \n", $line[$field], $line[$column]);
+        }
+        $sql .= "END,";
+    }
+
+    return rtrim($sql, ',');
+}
+
+/**
+ * 解析where条件
+ * @param $params
+ * @return array|string
+ */
+function parseParams($params)
+{
+   $where = [];
+   foreach ($params as $key => $value) {
+      $where[] = sprintf("`%s` = '%s'", $key, $value);
+   }
+   
+   return $where ? ' AND ' . implode(' AND ', $where) : '';
+}
+得到这样一个批量更新的SQL语句：
+
+UPDATE `post` SET `id` = CASE `id` 
+WHEN '1' THEN '1' 
+WHEN '2' THEN '2' 
+WHEN '3' THEN '3' 
+WHEN '4' THEN '4' 
+WHEN '5' THEN '5' 
+END,`parent_id` = CASE `id` 
+WHEN '1' THEN '100' 
+WHEN '2' THEN '100' 
+WHEN '3' THEN '100' 
+WHEN '4' THEN '100' 
+WHEN '5' THEN '101' 
+END,`title` = CASE `id` 
+WHEN '1' THEN 'A' 
+WHEN '2' THEN 'A' 
+WHEN '3' THEN 'A' 
+WHEN '4' THEN 'B' 
+WHEN '5' THEN 'A' 
+END,`sort` = CASE `id` 
+WHEN '1' THEN '1' 
+WHEN '2' THEN '3' 
+WHEN '3' THEN '5' 
+WHEN '4' THEN '7' 
+WHEN '5' THEN '9' 
+END WHERE `id` IN ('1','2','3','4','5')  AND `parent_id` = '100' AND `title` = 'A'
+生成的SQL把所有的情况都列了出来。
+
+不过因为有WHERE限定了条件，所以只有id为1、2、3这几条记录被更新。
+
+如果只需要更新某一列，其他条件不限，那么传入的$data可以更简单：
+
+$data = [
+    ['id' => 1, 'sort' => 1],
+    ['id' => 2, 'sort' => 3],
+    ['id' => 3, 'sort' => 5],
+];
+echo batchUpdate($data, 'id');
+这样的数据格式传入，就可以修改id从1~3的记录，将sort分别改为1、3、5。
+
+得到SQL语句：
+
+UPDATE `post` SET `id` = CASE `id` 
+WHEN '1' THEN '1' 
+WHEN '2' THEN '2' 
+WHEN '3' THEN '3' 
+END,`sort` = CASE `id` 
+WHEN '1' THEN '1' 
+WHEN '2' THEN '3' 
+WHEN '3' THEN '5' 
+END WHERE `id` IN ('1','2','3')
+这种情况更加简单高效。
+
+ 

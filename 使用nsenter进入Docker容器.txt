@@ -1,0 +1,29 @@
+关于什么是 nsenter 请参考如下文章：https://github.com/jpetazzo/nsenter 。
+
+在了解了什么是 nsenter 之后，我们需要把 nsenter 安装到主机中（注意：是主机而非容器或镜像），具体的安装命令如下：
+
+$ wget https://www.kernel.org/pub/linux/utils/util-linux/v2.24/util-linux-2.24.tar.gz
+$ tar -xzvf util-linux-2.24.tar.gz
+$ cd util-linux-2.24/
+$ ./configure --without-ncurses
+$ make nsenter
+$ sudo cp nsenter /usr/local/bin
+以上命令直接复制粘贴可用。安装好 nsenter 之后可以用nsenter --help查看该命令的使用。
+
+nsenter 可以访问另一个进程的名称空间。所以为了连接到某个容器，还需要获取该容器第一个进程的PID。可以使用docker inspect -f {{.State.Pid}} <容器ID/名称>命令来拿到该PID，例如容器的ID为44fc0f0582d9，那么对应命令：
+
+$ docker inspect -f {{.State.Pid}} 44fc0f0582d9
+3326
+在拿到该进程PID之后我们就可以使用nsenter命令访问该容器了。
+
+$ sudo nsenter --target 3326 --mount --uts --ipc --net --pid
+root@0b5c25f10a15:/#
+其中的3326即刚才拿到的进程的PID。
+
+ 进入运行中的容器shell
+1
+# docker-enter 65615a
+
+）安装nsenter
+1
+# docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter

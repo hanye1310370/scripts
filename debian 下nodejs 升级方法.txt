@@ -1,0 +1,21 @@
+升级nodejs
+
+
+
+
+#yarn add gulp 报错：
+The engine "node" is imcompatible with this module.Expected version ">+6.0.0 error Found imcompatible module
+
+升级nodejs:
+
+npm cache clean -f
+npm install -g n
+n stable
+这样nodejs 就升级到最新稳定版了！！
+
+n 是一个Node 工具包，它提供了几个升级命令参数：
+n  显示已安装的Node 版本
+n latest 安装最新版本Node
+n  stable  安装最新稳定版本
+n lts  安装最新长期维护版
+n <version> 根据提供的版本号安装Node

@@ -1,0 +1,115 @@
+docker 搭建LNMP环境
+转载 2016年11月12日 21:52:55 536200
+转自：http://www.vckai.com/p/29
+http://www.cnblogs.com/wangxusummer/p/5207449.html
+ 
+ 1. 安装docker
+        这个就不说了，不会的可以看下我之前的文章《Docker介绍及安装》。
+ 
+    1）启动docker
+1
+# service docker start
+ 
+ 2. 下载docker镜像
+        官网docker镜像网站：https://www.docker.com/，可以在这里查看官网或者第三方的docker镜像。当然如果没有VPN，网络比较慢的情况下，可以考虑使用：https://docker.cn/，这是一个国内的镜像网站。
+ 
+    1）下载docker镜像
+1
+# docker pull docker.cn/docker/centos:centos6
+        说明：docker pull命令是从远程下载镜像的命令，类似git pull。docker.cn/docker/centos是国内镜像网站centos镜像的地址，如果要下载官方centos镜像，直接使用centos即可。:centos6是指这个镜像的tag，我下载的是centos6，如果要下载最新版本，可以使用:latest或者:centos7。
+ 
+    2）查看镜像
+1
+# docker images
+         OK，可以看到centos镜像已经下载下来了。
+
+ 3.  运行容器
+        根据刚刚下载的centos镜像运行一个容器进入shell。
+ 
+    1）运行容器，进入该容器的shell界面
+1
+# docker run -i -t docker.cn/docker/centos:centos6 /bin/bash
+        现在我们已经进入容器的shell界面了，这个就是我们下载下来的centos6系统的shell，如图：
+
+ 
+        下面就是在容器中安装lnmp环境。
+        这里就不详细说了，如果不会安装lnmp的，可以看这里：《centos6 下安装nginx1.7.9+php5.6.4+mysql5.6.2》。
+        安装完成lnmp之后，输入exit退出镜像shell界面。
+
+        
+ 
+ 4. 制作生成新镜像
+         先查看下刚刚运行的容器（安装lnmp的）的ID，在使用该ID生成新的镜像。
+ 
+    1） 查看刚刚运行的容器ID
+1
+# docker ps -lq
+        
+        可以看到ID为：fe77b1628688，下面我们提交下这个容器生成新镜像。
+ 
+    2）提交生成新镜像
+1
+# docker commit fe77b vckai/dev:v1
+        fe77b1628688这里一般只需要使用前几位数就行了，只要不重复能识别到，可以不输入全部的，vckai/dev:v1 是我生成的新镜像名，如果输入已有的镜像名，则会覆盖原有的镜像。
+
+        这里可以看到已经生成好一个新的镜像了，ID为：8717b405408e3df2a12b503e327226d35d6ce118ebc66178ca2bfe440bcb8f04。
+ 
+    3）查看所有的镜像
+1
+# docker images
+        可以看到，刚刚我们生成的镜像就在这里了。
+
+ 
+ 5. 启动镜像
+1
+# docker run -d -p 80:80 -v /web:/www vckai/dev:v1 /sbin/init
+        -d是以Daemon模式运行。
+        -p 80:80 是将本地80端口映射到容器的80端口，现在可以在本地使用http://localhost访问。
+        -v /web:/www 是将本地的/web目录挂载到容器的/www(容器配置的web目录)目录下。
+        vckai/dev:v1 是要运行的镜像名称。
+        /sbin/init 是容器运行后的系统初始化操作，主要用于启动nginx，php-fpm，mysql服务。
+        
+    1）查看docker运行中的镜像
+1
+# docker ps
+ 
+    2）停止/重启/kill/启动容器（可选）
+1
+# docker stop/restart/kill/start <ID/Name>
+        更多容器操作命令可以看这篇文章：Docker学习笔记。  
+ 
+        这个时候你已经可以使用http://localhost 访问你的网站了，咦，奇怪，居然访问不了！突然想起没在容器中配置开机启动，以至/sbin/init初始化的时候没把nginx+php+mysql启动起来。
+        现在只能先把容器停止，然后进入vckai/dev:v1这个容器，在/etc/rc.local文件中添加nginx、php和mysql的启动运行，然后在docker commit提交覆盖vckai/dev:v1即可。
+        
+        另外，如果已经在运行中的容器，怎么进入查看呢？两种方式，一个ssh，另外一个使用nsenter。但是不建议使用ssh进入：为什么不需要在 Docker 容器中运行 sshd。
+        
+    1）安装nsenter
+1
+# docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
+    2）进入运行中的容器shell
+1
+# docker-enter 65615a
+    65615a 是我们刚刚使用docker ps查看到的容器ID。
+    3）启动容器的nginx+php
+1
+2
+# /data/apps/nginx/sbin/nginx
+# /data/apps/php/sbin/php-fpm
+ 
+        OK，现在打开网站已经是正常运行了！
+ 
+参考资料：
+Docker教程中文版本：https://code.csdn.net/u010702509/docker
+Nsenter github：https://github.com/jpetazzo/nsenter
+docker命令学习笔记：http://blog.csdn.net/we_shell/article/details/38368137?utm_source=tuicool
+ 
+FAQ:
+1docker run -d -p 80:80 -v /web:/www vckai/dev:v1 /sbin/init
+请问如何取消这个命令？
+答：通过docker ps 查看容器的ID，再通过docker stop <容器ID>停止容器即可
+2$docker ps  报错
+Cannot connect to the Docker daemon. Is 'docker -d' running on this host?
+$docker -d
+docker: relocation error: docker: symbol dm_task_get_info_with_deferred_remove, version Base not defined in file libdevmapper.so.1.02 with link time reference
+ 
+答：运行

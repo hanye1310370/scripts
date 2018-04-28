@@ -1,0 +1,10 @@
+root@iZ2ze5m012qi4yng2935q4Z:/home# cat slow.sh 
+#!/bin/bash
+while true
+do
+  /usr/local/mysql/bin/mysql  -uzz-fx-com -p1vCEclfJeuoqlkKN -hrds-1fangxin.mysql.rds.aliyuncs.com  -e "show full processlist"|awk '{for (i=1;i<=5;i++) $i=""; print $0}'|grep -v "NULL" | awk '{if ($1>1) {print $0}}'|grep -v "Time" >> /home/mysql_slow_log.txt >/dev/null 2>&1
+sleep 1
+done
+
+
+./src/redis-trib.rb create --replicas 1  127.0.0.1:7001 127.0.0.1:7002 127.0.0.1:7003 127.0.0.1:7004 127.0.0.1:7005  127.0.0.1:8001 127.0.0.1:8002 127.0.0.1:8003 127.0.0.1:8004 127.0.0.1:8005

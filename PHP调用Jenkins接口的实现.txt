@@ -1,0 +1,76 @@
+PHP调用Jenkins接口的实现
+PHP调用Jenkins接口的实现
+原创 2016年07月23日 21:34:15 标签：php 1426
+内容：
+Jenkins对外提供的接口，
+php如何通过curl调用Jenkins接口实现Jenkins中构建的创建
+
+        最近，在使用Jenkins时，需要通过网页后台PHP来调用Jenkins实现Jenkins管理的项目构建的创建，发现网上对于这个讲解不是很清晰
+这里自己整理了一些资料，然后通过在代码中实践，实现了一些功能。
+【API】
+1.创建Jenkins项目
+shell 方式：
+curl -X POST http://www.xxx.xxx/jenkins/createItem?name=JavaStd --user peterguo:peterguo --data-binary "@javastd.config.xml" -H"Content-Type: text/xml"
+php 方式（通过exec命令）：
+exec(
+”curl -X POST http://www.xxx.xxx/jenkins/createItem?name=JavaStd --user peterguo:peterguo --data-binary \"@javastd.config.xml\" -H\"Content-Type: text/xml\""
+,$res,$rt);
+注：$res 返回结果，$rt 返回为0表示成功，非0表示错误
+2.禁用 
+shell 方式：
+curl -X POST http://www.xxx.xxx/jenkins/job/JavaStd/disable  --userpeterguo:peterguo
+php 方式：
+php 方式（通过exec命令）：
+exec(”curl -X POST http://www.xxx.xxx/jenkins/job/JavaStd/disable  --userpeterguo:peterguo",$res,$rt);
+注：$res 返回结果，$rt 返回为0表示成功，非0表示错误
+3.启用 
+shell 方式：
+curl -X POST http://www.xxx.xxx/jenkins/job/JavaStd/enable --userpeterguo:peterguo
+php 代码中嵌入（通过exec命令）：
+exec(”curl -X POST http://www.xxx.xxx/jenkins/job/JavaStd/enable --userpeterguo:peterguo",$res,$rt);
+注：$res 返回结果，$rt 返回为0表示成功，非0表示错误
+4.删除 
+curl -X POST http://www.xxx.xxx/jenkins/job/JavaStd/doDelete --userpeterguo:peterguo
+php 代码中嵌入（通过exec命令）：
+exec(”curl -X POST http://www.xxx.xxx/jenkins/job/JavaStd/doDelete --userpeterguo:peterguo",$res,$rt);
+注：$res 返回结果，$rt 返回为0表示成功，非0表示错误
+
+5.获取项目描述 
+curl -X GET http://www.xxx.xxx/jenkins/job/JavaStd/description --userpeterguo:peterguo
+php 代码中嵌入（通过exec命令）：
+exec(”curl -X GET http://www.xxx.xxx/jenkins/job/JavaStd/description --userpeterguo:peterguo",$res,$rt);
+注：$res 返回结果，$rt 返回为0表示成功，非0表示错误
+
+6.获取配置文件 
+curl -X GET http://www.xxx.xxx/jenkins/job/JavaStd/config.xml --userpeterguo:peterguo
+php 代码中嵌入（通过exec命令）：
+exec(”curl -X GET http://www.xxx.xxx/jenkins/job/JavaStd/config.xml --userpeterguo:peterguo",$res,$rt);
+注：$res 返回结果，$rt 返回为0表示成功，非0表示错误
+
+7.触发SCM检查 
+
+curl -X GET http://www.xxx.xxx/jenkins/job/JavaStd/polling --userpeterguo:peterguo
+php 代码中嵌入（通过exec命令）：
+exec(”curl -X GET http://www.xxx.xxx/jenkins/job/JavaStd/polling --userpeterguo:peterguo",$res,$rt);
+注：$res 返回结果，$rt 返回为0表示成功，非0表示错误
+
+8.普通触发 
+curl -X GET http://www.xxx.xxx/jenkins/job/JavaStd/build --userpeterguo:peterguo
+php 代码中嵌入（通过exec命令）：
+exec(”curl -X GET http://www.xxx.xxx/jenkins/job/JavaStd/build --userpeterguo:peterguo“,$res,$rt);
+注：$res 返回结果，$rt 返回为0表示成功，非0表示错误
+
+9.带参数触发
+curl -X GET"http://www.xxx.xxx/jenkins/job/helloworld-freestyle/buildWithParameters?bAllTest=&Choices=2&strParam=abc"--user peterguo:peterguo
+php 代码中嵌入（通过exec命令）：
+exec(”curl -X GETcurl -X GET \"http://www.xxx.xxx/jenkins/job/helloworld-freestyle/buildWithParameters?bAllTest=&Choices=2&strParam=abc\" --user peterguo:peterguo",$res,$rt);
+注：$res 返回结果，$rt 返回为0表示成功，非0表示错误
+
+10.带参数和补丁触发  
+curl -X POST"http://www.xxx.xxx/jenkins/job/helloworld-freestyle/buildWithParameters?bAllTest=&Choices=2&strParam=abc"--user peterguo:peterguo -F "action=upload" -F"patch.diff=@OtherTest.java.patch"
+php 代码中嵌入（通过exec命令）：
+exec(”curl -X POST \"http://www.xxx.xxx/jenkins/job/helloworld-freestyle/buildWithParameters?bAllTest=&Choices=2&strParam=abc\" --user peterguo:peterguo -F \"action=upload\" -F \"patch.diff=@OtherTest.java.patch\"",$res,$rt);
+注：$res 返回结果，$rt 返回为0表示成功，非0表示错误
+
+在项目中需要通过网站触发Jenkins管理项目组件的构建时，我们可以再后台利用PHP的exec来调用底层的shell，通过shell调用相应的API来实现远程触发Jenkins的功能。当然也可以利用php中的curl函数来实现这个功能。
+———————————————————————EOF————————————————————————————————--

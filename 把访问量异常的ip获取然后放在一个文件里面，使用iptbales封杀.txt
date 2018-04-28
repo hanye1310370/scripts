@@ -1,0 +1,17 @@
+[root@localhost logs]# cat /sbin/cc.sh 
+#!/bin/sh
+LOG_FILE=/usr/local/nginx/logs/xxx.xxx.com.access.log   #访问日志
+IP_FILE=/etc/black       #存放需要禁止的ip文件
+NUMBER=2000              #非法访问量的值
+wan0=eth0                #网卡
+BACKIP=`cat $IP_FILE`   #每次操作先清空之前的ip
+`cat /dev/null > $IP_FILE`
+Denyip=`cat $LOG_FILE|grep -i -v -E "bing|baidu|google|sougou"|awk '{print $1}'|sort | uniq -c | sort -n -k 1 -r | head -n 1000000|awk '{if($1>'$NUMBER')print $2}'`
+echo $Denyip > $IP_FILE
+if [ "$BACKIP" != "" ];then
+        for X in $BACKIP
+        do
+                echo $X ---deny
+                iptables -A INPUT -i $wan0 -s $X -p all -j DROP
+        done
+fi

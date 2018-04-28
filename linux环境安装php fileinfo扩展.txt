@@ -1,0 +1,44 @@
+linux环境安装php fileinfo扩展
+
+　　windows环境安装扩展比较简单，只需要把dll拷贝到扩展目录，修改php.ini中相应的扩展就好了。
+
+ 
+
+　　下面来介绍一下linux环境下的php扩展安装，以centos6.5和php7.1为例，介绍一下fileinfo的安装。
+
+ 
+
+　　根据手册的介绍fileinfo扩展从php5.3之后默认是开启的，所以不需要我们单独安装。但是有的集成环境为了编译php的时候提高速度或者节省资源就去掉了这个扩展的安装。所以就需要我们自己动手来安装了。
+
+　　我们从fileinfo的源码来安装这个扩展。fileinfo的源码在php源码的“src/ext/fileinfo”的目录下面，可以用find来找到具体的路径
+
+find / -name fileinfo
+　　
+
+　　找到路径之后进入到fileinfo目录中。
+
+　　开始扩展的安装：
+
+　　1. phpize
+
+　　执行phpize命令
+
+　　2. ./configure --with-php-config=/usr/local/php/bin/php-config
+
+　　执行configure配置。
+
+　　如果提示php-config命令不存在 configure: error: Cannot find php-config. Please use --with-php-config=PATH
+
+　　
+
+　　可以执行yum install php-devel， 安装php-devel，安装完成之后再执行这条命令即可。
+
+　　3. make && make install
+
+　　编译安装
+
+　　4. 修改php.ini文件，添加extension=fileinfo.so
+
+ 
+
+　　到此为止就安装成功了。

@@ -1,0 +1,75 @@
+最近mysql总会出现锁表，目前正在分析，今天临时写个脚本，并添加微信消息推送，实时关注
+
+#!/bin/bash --login
+#---------------------------------------------------------
+# $Name:         check.sh
+# $Version:      v1.0
+# $Author:       qiuyuetao
+# $QQ: 598759292  
+# $Create Date:  2017-12-13
+# $Description:  Check Queue, Yepay Call, DB Lock
+#---------------------------------------------------------
+DATE=`date +%F-%H-%M`
+
+##WeiXin ENV-------------------------------------------------------------------------------------
+CropID='自己申请公众号ID'
+Secret='HxTbS_-rNujfHBAqFt7XMifFKEHQTX_yTNK2ciGob43mHgfc_GJiNW2dwjlitOCS'
+
+APIURL="https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=$CropID&corpsecret=$Secret"
+TOKEN=$(/usr/bin/curl -s -G $APIURL | awk -F\" '{print $10}')
+POSTURL="https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=$TOKEN"
+
+##WeiXin body--------------------------------------------------------------------------------------
+function body() {
+        local int AppID=1
+        local UserID=自己公众号用户
+        local PartyID=2
+        printf '{\n'
+        printf '\t"touser": "'"$UserID"\"",\n"
+        printf '\t"toparty": "'"$PartyID"\"",\n"
+        printf '\t"msgtype": "text",\n'
+        printf '\t"agentid": "'"$AppID"\"",\n"
+        printf '\t"text": {\n'
+        printf '\t\t"content": "'-"$Msg"\""\n"
+        printf '\t},\n'
+        printf '\t"safe":"0"\n'
+        printf '}\n'
+     }
+
+##Check DB LOCK--------------------------------------------------------------------------------------
+function ckdblock() {
+CKHOST="127.0.0.1"
+CKDB="information_schema"
+CKUSER="root"
+CKPWD="****数据库密码!"
+CKMLLOG="/root/shell/check/cklock/cklock.txt"
+
+LKCON=`/usr/bin/mysql -h "$CKHOST" -u "$CKUSER" -p"$CKPWD" -e "SELECT count(*)  FROM "$CKDB".INNODB_LOCKS" |tr -d 'count(*) '`
+LKTAB=`/usr/bin/mysql -h "$CKHOST" -u "$CKUSER" -p"$CKPWD" -e "SELECT lock_table FROM "$CKDB".INNODB_LOCKS"`
+
+/usr/bin/mysql -h "$CKHOST" -u "$CKUSER" -p"$CKPWD" -e "SELECT lock_table FROM "$CKDB".INNODB_LOCKS" |grep 'ylhccn_jobs'
+JOBSTAT=$?
+     echo "---------------------------------------"
+     echo "目前锁表数量： $LKCON"
+     echo "目前锁表名字： $LKTAB"
+     echo "---------------------------------------"
+
+if [ "$LKCON" -gt 0 ]; then
+
+      /usr/bin/mysql -h "$CKHOST" -u "$CKUSER" -p"$CKPWD"  -e "SELECT * FROM "$CKDB".innodb_trx \G"  >> $CKMLLOG
+ else
+    Msg="MySQL正常,无锁表异常状态"
+     echo  "$(body guozhiheng0123 $2 )" $POSTURL
+     /usr/bin/curl --data-ascii "$(body guozhiheng0123 $2)" $POSTURL
+
+fi
+}
+
+##Main--------------------------------------------------------------------------------------
+main(){
+        ckdblock;
+}
+
+main
+
+##END----------------------------

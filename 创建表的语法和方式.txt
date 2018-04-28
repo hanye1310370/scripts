@@ -1,0 +1,39 @@
+创建表的语法和方式
+更新时间：2017-08-04 11:00:52   分享：   
+本文主要介绍使用 DDL 语句进行建表的语法、子句和参数，以及基本方式。
+
+注意：DRDS 目前不支持使用 DDL 语句直接建库，请登录 DRDS 控制台进行创建。具体操作指南请参考创建 DRDS 数据库。
+
+语法：
+
+CREATE [TEMPORARY] TABLE [IF NOT EXISTS] tbl_name
+    (create_definition,...)
+    [table_options]
+    [drds_partition_options]
+    [partition_options]
+drds_partition_options:
+    DBPARTITION BY
+        HASH([column])
+        [TBPARTITION BY
+            { HASH(column)
+            | {MM|DD|WEEK|MMDD}(column)}
+          [TBPARTITIONS num]
+        ]
+分库分表的子句和参数：
+
+DBPARTITION BY hash(partition_key)：指定分库键和分库算法，不支持按照时间分库；
+
+TBPARTITION BY { HASH(column) | {MM|DD|WEEK|MMDD}(column)（可选）：默认与 DBPARTITION BY 相同，指定物理表使用什么方式映射数据；
+
+TBPARTITIONS num（可选）：每个库上的物理表数目（默认为1），如不分表，就不需要指定该字段。
+
+分库分表的基本方式及补充：
+
+单库单表（不拆分）
+只分库不分表
+既分库又分表
+使用主键作为拆分字段
+广播表
+其他 MySQL 建表属性
+
+

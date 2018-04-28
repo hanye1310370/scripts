@@ -1,0 +1,17 @@
+qa@fangxin-test:~$ cat wechat_dev/.env|grep URL
+ADMIN_URL = admin-wx-dev.1fangxin.net
+MEMBER_URL = member-wx-dev.1fangxin.net
+API_URL = api-wx-dev.1fangxin.net
+WEB_URL = www-wx-dev.1fangxin.net
+DC_URL = dc-qa.1fangxin.net
+WAP_URL = wap-wx-dev.1fangxin.net
+WEB_SYNC_URL = sync-test.1fangxin.net
+qa@fangxin-test:~$ cat wechat_test/.env|grep URL
+ADMIN_URL = admin-wx-test.1fangxin.cn
+MEMBER_URL = member-wx-test.1fangxin.cn
+API_URL = api-wx-test.1fangxin.cn
+WEB_URL = www-wx-test.1fangxin.cn
+DC_URL = dc-qa.1fangxin.cn
+WAP_URL = wap-wx-test.1fangxin.cn
+WEB_SYNC_URL = sync-test.1fangxin.cn
+qa@fangxin-test:~$ 

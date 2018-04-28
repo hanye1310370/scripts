@@ -1,0 +1,26 @@
+公司最近有项目上了Redis做缓存，初期准备两台redis，一台redis读，一台redis写。出于扩展考虑，未来新增机器希望能通过修改配置，快速部署使用。使用场景即：master 负责 写，其他slave 随机读。
+
+此驱动相比tp官方发布的redis扩展，支持读写分离，支持redis集群。
+
+使用方法：
+
+1. 下载类库 解压 上传到核心扩展 /Extend/Driver/Cache/ 下
+
+2. 项目配置里新增如下配置内容：
+
+        'DATA_CACHE_PREFIX' => 'Redis_',//缓存前缀
+    'DATA_CACHE_TYPE'=>'Redis',//默认动态缓存为Redis
+    'REDIS_RW_SEPARATE' => true, //Redis读写分离 true 开启
+    'REDIS_HOST'=>'192.168.1.11,192.168.1.12', //redis服务器ip，多台用逗号隔开；读写分离开启时，第一台负责写，其它[随机]负责读；
+    'REDIS_PORT'=>'6379',//端口号
+    'REDIS_TIMEOUT'=>'300',//超时时间
+    'REDIS_PERSISTENT'=>false,//是否长连接 false=短连接
+    'REDIS_AUTH'=>'',//AUTH认证密码
+复制代码
+3. 缓存的使用 参看 THINKPHP 手册 快捷缓存 内容
+
+S('data',123);//写入缓存操作
+
+S('data',3600,'1111'); // 有效期写入
+
+S('data');//读取缓存操作

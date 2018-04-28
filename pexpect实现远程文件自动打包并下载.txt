@@ -1,0 +1,81 @@
+pexpect实现远程文件自动打包并下载
+pexpect实现远程文件自动打包并下载
+
+#!/usr/bin/python
+
+ 
+
+import pexpect,sys
+
+ 
+
+ip = “172.16.20.52“
+
+user = “root“
+
+passwd = “123456
+
+target_file =“/data/logs/admin.log“
+
+child = pexpect.spawn(‘/usr/bin/ssh’,[user+’@’+ip])
+
+fout = file(‘mylog.txt’,’w’)
+
+child.logfile = fout
+
+ 
+
+try:
+
+        child.expect(‘(?i)password’)
+
+        child.sendline(passwd)
+
+        child.expect(‘#’)
+
+        child.sendline(“tar -czf /data/adminlog.tar.gz “+target_file)
+
+        child.expect(‘#’)
+
+        print child.before
+
+        child.sendline(‘exit’)
+
+        fout.close()
+
+ 
+except pexpect.EOF,e:
+
+    print “except EOF“,e
+
+except pexpect.TIMEOUT,e:
+
+    print “except TIMEOUT“,e
+
+ 
+
+child = pexpect.spawn(‘/usr/bin/scp’, [user+’@’+ip+':/data/adminlog.tar.gz’,’/home’])
+
+fout = file(‘mylog.txt’,’a’)
+
+child.logfile = fout
+
+ 
+
+try:
+
+    child.expect(‘(?i)password’)
+
+    child.sendline(passwd)
+
+    child.expect(pexpect.EOF)
+
+except pexpect.EOF,e:
+
+    print “expect EOF“,e
+
+except TIMEOUT,e:
+
+    print “expect TIMEOUT“,e
+
+ 

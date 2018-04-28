@@ -1,0 +1,27 @@
+同事要把生产环境上的一部分表加载到测试环境去,每次导出的表可能不一样。为了省去每次写脚本的麻烦，方便多个表的导出，特写如下脚本。
+
+
+在第一层for循环里，传入导出的数据库。
+select db from mysql.db where db   in ('cacti') 
+在第二层for循环里，传入导出的表名。
+SELECT table_name from information_schema.TABLES where TABLE_SCHEMA='cacti' and  table_name like'graph%'
+
+ 
+
+#!/bin/sh
+bakuser=root
+bakpass=1.23456
+bakport=3316
+baksocket=/tmp/mysql.sock
+mycmd="mysql -u$bakuser -p$bakpass -P$bakport -S$baksocket"
+dbdump="mysqldump -u$bakuser -p$bakpass -P$bakport -S$baksocket "
+
+for database in `$mycmd -N -e "select db from mysql.db where db   in ('cacti') "`
+do
+  mkdir -p  /mysql/dbbak/${database}
+  for table in `$mycmd -N -e "SELECT table_name from information_schema.TABLES where TABLE_SCHEMA='cacti' and  
+table_name like'graph%'" `
+    do
+       $dbdump  $database $table |gzip > /mysql/dbbak/${database}/${table}_$(date +%F).sql.gz
+    done
+done

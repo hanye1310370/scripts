@@ -1,0 +1,98 @@
+目的：缓存nginx服务器的静态文件。如css,js,htm,html,jpg,gif,png,flv,swf，这些文件都不是经常更新。便于缓存以减轻服务器的压力。
+实现：nginx proxy_cache可以将用户的请缓存到本地一个目录，当下一个请求时可以直接调取缓存文件，就不用去后端服务器去取文件了。
+配置：打开配置文件/usr/local/nginx/conf/nginx.conf
+user  www www;
+worker_processes 2;
+error_log  /var/log/nginx_error.log  crit;
+worker_rlimit_nofile 65535;
+events
+{
+  use epoll;
+  worker_connections 65535;
+}
+
+http
+{
+  include       mime.types;
+  default_type  application/octet-stream;
+
+  server_names_hash_bucket_size 128;
+  client_header_buffer_size 32k;
+  large_client_header_buffers 4 32k;
+  client_max_body_size 8m;
+
+  sendfile on;
+  tcp_nopush     on;
+  keepalive_timeout 0;
+  tcp_nodelay on;
+
+  fastcgi_connect_timeout 300;
+  fastcgi_send_timeout 300;
+  fastcgi_read_timeout 300;
+  fastcgi_buffer_size 64k;
+  fastcgi_buffers 4 64k;
+  fastcgi_busy_buffers_size 128k;
+  fastcgi_temp_file_write_size 128k;
+  ##cache##
+  proxy_connect_timeout 5;
+  proxy_read_timeout 60;
+  proxy_send_timeout 5;
+  proxy_buffer_size 16k;
+  proxy_buffers 4 64k;
+  proxy_busy_buffers_size 128k;
+  proxy_temp_file_write_size 128k;
+  proxy_temp_path /home/temp_dir;
+  proxy_cache_path /home/cache levels=1:2 keys_zone=cache_one:200m inactive=1d max_size=30g;
+  ##end##
+
+  gzip    on;
+  gzip_min_length   1k;
+  gzip_buffers   4 8k;
+  gzip_http_version  1.1;
+  gzip_types   text/plain application/x-javascript text/css  application/xml;
+  gzip_disable "MSIE [1-6]\.";
+
+  log_format  access  '$remote_addr - $remote_user [$time_local] "$request" '
+             '$status $body_bytes_sent "$http_referer" '
+             '"$http_user_agent" $http_x_forwarded_for';
+  upstream appserver { 
+        server 192.168.1.251;
+  }
+  server {
+        listen       80 default;
+        server_name www.gangpao.com;
+        location ~ .*\.(gif|jpg|png|htm|html|css|js|flv|ico|swf)(.*) {
+              proxy_pass http://appserver;
+              proxy_redirect off;
+              proxy_set_header Host $host;
+              proxy_cache cache_one;
+              proxy_cache_valid 200 302 1h;
+              proxy_cache_valid 301 1d;
+              proxy_cache_valid any 1m;
+              expires 30d;
+        }
+        location ~ .*\.(php)(.*){
+             proxy_pass http://appserver;
+             proxy_set_header        Host $host;
+             proxy_set_header        X-Real-IP $remote_addr;
+             proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+        access_log /usr/local/nginx/logs/www.gangpao.com.log;
+  }
+}
+红色部分是配置缓存的参数。
+说明：
+1、http段设置。
+proxy_temp_path /home/temp_dir;设置临时目录
+proxy_cache_path /home/cache levels=1:2 keys_zone=cache_one:200m inactive=1d max_size=30g;设置缓存目录为二级目录，共享内存区大小，非活动时间，最大容量，注意临时目录要跟缓存目录在同一个分区。
+2、server段设置
+请求静态文件设置。
+proxy_cache cache_one;设置缓存共享内存区块，也就是keys_zone名称。
+proxy_cache_valid 200 302 1h;设置http状态码为200,302缓存时间为1小时。
+expires 30d;设置失期时间，为30天
+请求动态文件设置。
+proxy_pass http://appserver;不进行缓存，直接转到后端服务器。
+测试：当客户端发起http请求时在服务器上会产一个缓存文件如
+/home/cache/0/b9/8bd841b1c44ee5b91457eb561e44eb90
+
+OK

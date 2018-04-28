@@ -1,0 +1,95 @@
+昨天写了一篇《创建支持SSH服务的CentOS镜像 》，介绍的是如何使用命令一步一步的新建一个支持SSH服务的Centos镜像。但是无法满足生产环境流程化，标准化，快速生成的需要的。 
+因此就需要使用Dockerfile来生成所需镜像，这样，无论在什么环境下，都可以使用docker build快速，标准，无差错的批量生成一模一样的镜像，方便管理员快速布署。 
+具体步骤如下：
+
+1、在/root目录下新建sshd_centos目录用于存放Dockerfile和其他相关文件。
+
+mkdir sshd_centos
+#进入该目录
+cd sshd_centos
+
+2、新建在容器中启动sshd服务的脚本
+
+vim run.sh
+1
+脚本内容如下：
+
+#!/bin/bash
+/usr/sbin/sshd -D
+1
+2
+3、在宿主机上生成RSA密钥
+
+ssh-keygen -t rsa -b 2048 -f /etc/ssh/ssh_host_rsa_key
+1
+然后将生成的密钥复制到sshd_centos目录中
+
+cp /etc/ssh/ssh_host_rsa_key /etc/ssh/ssh_host_rsa_key.pub /root/sshd_centos
+cat ssh_host_rsa_key.pub>authorized_keys
+1
+2
+5、在/root/sshd_centos目录下新建Dockerfile文件
+
+vim Dockerfile
+
+Dockerfile内容：
+
+#生成的新镜像以centos镜像为基础
+FROM centos
+MAINTAINER by cmzsteven (changmingzhi@163.com)
+#升级系统
+RUN yum -y update
+#安装openssh-server
+RUN yum -y install openssh-server
+#修改/etc/ssh/sshd_config
+RUN sed -i 's/UsePAM yes/UsePAM no/g' /etc/ssh/sshd_config
+#将密钥文件复制到/etc/ssh/目录中
+ADD ssh_host_rsa_key /etc/ssh/ssh_host_rsa_key
+ADD ssh_host_rsa_key.pub /etc/ssh/ssh_host_rsa_key.pub
+RUN mkdir -p /root/.ssh
+ADD authorized_keys /root/.ssh/authorized_keys
+#将ssh服务启动脚本复制到/usr/local/sbin目录中，并改变权限为755
+ADD run.sh /usr/local/sbin/run.sh
+RUN chmod 755 /usr/local/sbin/run.sh
+#变更root密码为147258
+RUN echo "root:147258"|chpasswd
+#开放窗口的22端口
+EXPOSE 22
+#运行脚本，启动sshd服务
+CMD ["/usr/local/sbin/run.sh"]
+
+其中绝大多数命令在《创建支持SSH服务的CentOS镜像 》都有介绍 
+其实可以把Dockerfile想像成shell角本，里面执大部分内容都是shell命令。
+
+此时 /root/sshd_centos目录下应该存在如下文件：
+
+Dockerfile
+run.sh
+ssh_host_rsa_key
+ssh_host_rsa_key.pub
+
+6、使用docker build生成镜像文件
+
+docker build -t sshd:dockerfile .
+
+注意命令最后面是一个”.”，这说明Dockerfile是在当前目录下。 
+执行完成后，会在最后显示
+
+Successfully built 411d5fb16366
+
+最后一串字符为Container ID 
+然后查看生成的镜像
+
+docker images
+
+执行结果
+
+REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
+sshd                dockerfile          411d5fb16366        9 minutes ago       278 MB
+
+7、以新创建的镜像新建容器
+
+docker run -d -p 10022:22 sshd:dockerfile /usr/local/sbin/run.sh
+1
+将宿主机的10022端口映射到容器的22端口，并启动sshd服务。 
+现在就可以使用ssh工具远程通过宿主机的10022端口访问容器了。

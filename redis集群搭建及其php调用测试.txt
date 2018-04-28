@@ -1,0 +1,126 @@
+redis集群搭建及其php调用测试
+一、安装ruby
+1、wgethttps://ruby.taobao.org/mirrors/ruby/ruby-2.3.3.tar.gz
+2、tar -zxvfruby-2.3.3.tar.gz
+3、./configure--prefix=/usr/local/ruby
+4、make
+5、make install
+6、vim/etc/profile
+   在最后一行添加  PATH=$PATH:/usr/local/ruby/bin;export PATH
+7、source/etc/profile
+8、ruby -v正常输出信息即可
+9、yum install-y rubygems
+ 
+二、安装redis cluster
+1、主节点：  127.0.0.1：9001    127.0.0.1：9002   127.0.0.1：9003
+   从节点：  127.0.0.1：9004    127.0.0.1：9005   127.0.0.1：9006
+2、cd/usr/local/
+3、mkdirredis-cluster
+4、cdredis-cluster
+5、mkdirredis01
+6、mkdirredis02
+7、mkdirredis03
+8、mkdirredis04
+9、mkdirredis05
+10、mkdirredis06
+11、wgethttp://download.redis.io/releases/redis-3.2.6.tar.gz
+12、tar -zxvfredis-3.2.6.tar.gz
+13、make
+14、cd src&& make test
+15、如果有报错，处理报错。比如我这里提示You need tcl 8.5 or newer in order to run the Redis test
+    则输入yum install tcl
+16、make test
+    如果最后提示All testspassed without errors! 则代表成功了
+17、makeprefix=/usr/local/redis-cluster/redis01/ install
+18、cpredis-server /usr/local/redis-cluster/redis01/
+19、cp redis-cli/usr/local/redis-cluster/redis01/
+20、cpredis-check-aof /usr/local/redis-cluster/redis01/
+21、cpredis-check-rdb /usr/local/redis-cluster/redis01/
+22、cpredis-benchmark /usr/local/redis-cluster/redis01/
+23、cpredis-sentinel /usr/local/redis-cluster/redis01/
+24、cpmkreleasehdr.sh /usr/local/redis-cluster/redis01/
+25、cpredis-trib.rb /usr/local/redis-cluster/
+26、cd ..
+27、cpredis.conf /usr/local/redis-cluster/redis01/
+28、cd/usr/local/redis-cluster/redis01
+29、cp ./*../redis02
+30、cp ./*../redis03
+31、cp ./*../redis04
+32、cp ./*../redis05
+33、cp ./*../redis06
+34、修改各目录下的redis.conf文件，修改128行daemonize的值为yes；修改721行，删除注释符号；修改84行，将端口号修改成各自到，比如9001.
+35、在/usr/local/redis-cluster/目录下创建start.sh文件，内容如下：
+         # /bin/bash
+exportPATH='/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin'
+cd/usr/local/redis-cluster/redis01/;./redis-server redis.conf;
+cd/usr/local/redis-cluster/redis02/;./redis-server redis.conf;
+cd/usr/local/redis-cluster/redis03/;./redis-server redis.conf;
+cd/usr/local/redis-cluster/redis04/;./redis-server redis.conf;
+cd/usr/local/redis-cluster/redis05/;./redis-server redis.conf;
+cd/usr/local/redis-cluster/redis06/;./redis-server redis.conf;
+ 
+36、 chmod a+xstart.sh
+37、  ./start.sh
+38、  ps -ef | grep redis  查看一下，是不是启动了6个进程；
+39、  ./redis-trib.rb create --replicas 1127.0.0.1:9001 127.0.0.1:9002 127.0.0.1:9003 127.0.0.1:9004 127.0.0.1:9005127.0.0.1:9006
+40、 如果报错上面，则执行gem installredis ，或者参考文档（http://blog.csdn.net/asas1314/article/details/50203923）
+ 
+三、集群测试
+1、cd/usr/local/redis-cluster/redis01/
+2、./redis-cli-h 127.0.0.1 -p 9002 -c
+   注意一定要带 -c ，否则进入的不是集群环境。 
+3、 set a 100
+   这时你发现会跳转，因为经过计算，存储100的hash槽在9003实例上，这样就代表集群成功。
+ 
+四、关闭集群服务
+1、在/usr/local/redis-cluster/目录下创建stop.sh文件，内容如下：
+# /bin/bash
+exportPATH='/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin'
+cd/usr/local/redis-cluster/redis01/;./redis-cli -p 9001 shutdown;
+cd/usr/local/redis-cluster/redis02/;./redis-cli -p 9002 shutdown;
+cd/usr/local/redis-cluster/redis03/;./redis-cli -p 9003 shutdown;
+cd/usr/local/redis-cluster/redis04/;./redis-cli -p 9004 shutdown;
+cd/usr/local/redis-cluster/redis05/;./redis-cli -p 9005 shutdown;
+cd/usr/local/redis-cluster/redis06/;./redis-cli -p 9006 shutdown;
+ 
+五、重启集群可能会提示这个错误
+[ERR] Node 127.0.0.1:9001is not empty. Either the node already knows other nodes (check with CLUSTERNODES) or contains some key in database 0.
+处理方法：删除各节点中到dump.rdb和nodes.conf这2个文件即可。
+如果不行，自行百度。
+ 
+六、安装php的redis扩展
+1、wgethttp://pecl.php.net/get/redis-3.1.0.tgz
+2、 cdredis-3.1.0
+3、/usr/local/php/bin/phpize
+4、  ./configure--with-php-config=/usr/local/php/bin/php-config
+5、 make&& make install
+6、vim/usr/local/php/etc/php.ini
+         增加 extension=redis.so
+7、重启服务
+ 
+七、编写PHP程序测试。
+<?php
+//ini_set('display_errors',1);
+// error_reporting(E_ALL);
+$redis = newRedisCluster(NULL, ['127.0.0.1:9001', '127.0.0.1:9002', '127.0.0.1:9003','127.0.0.1:9004', '127.0.0.1:9005', '127.0.0.1:9006']);
+ 
+$s1 =$redis->set('dingling', 'value1');
+$s2 =$redis->append('dingling', 'value2');
+$s3 = $redis->get('dingling');
+var_dump($s3.PHP_EOL);
+ 
+$redis->set('dingling2','rewwr432r');
+echo$redis->get('dingling2');echo PHP_EOL;
+ 
+$redis->set('aaa','100');
+echo$redis->get('aaa');echo PHP_EOL;
+ 
+$redis->set('zzz','23123');
+echo$redis->get('zzz');echo PHP_EOL;
+ 
+$redis->set('s1','vvcretf34t34肉分发');
+echo$redis->get('s1');echo PHP_EOL;
+ 
+#我们知道dingling,dingling2, aaa, zzz 是4个key ,会按照算法，分配到4个slot上，有可能分到4台不同服务器上（当然也有可能在同一台服务器上，如果这样，多写几个key测试），你可以观察有没有端口调整。连接客户端看下吧。
+ 
+#https://github.com/phpredis/phpredis/blob/feature/redis_cluster/cluster.markdown

@@ -1,0 +1,150 @@
+jenkins_da="/home/jenkins/ops/workspace/fx_erp_test"
+erp_da="/home/ops/erp/erp/"
+cd $erp_da
+cp ${jenkins_da}/* ${erp_da} -fr
+composer install
+gulp
+ sudo chmod -R 777 $erp_da
+ php  artisan   migrate
+ php artisan config:cache
+ php  artisan  queue:restart
+ 
+ 
+ 
+ 
+ 
+jenkins_date="/home/jenkins/ops/workspace/构建内部test环境"
+erp_date="/home/ops/erp/erptest"
+rm $erp_date/database/migrations/ -fr
+rm $erp_date/public/ -fr
+cp -fr $jenkins_date/* $erp_date/
+#rm -fr $jenkins_date/* 
+cd $erp_date/
+sudo chmod -R 777  $erp_date
+composer install
+/home/ops/erp/erptest/node_modules/.bin/gulp
+    #sudo chmod -R 777 $erp_date
+    php  artisan   migrate --force
+    #expect /home/ops/migrate.sh
+    php artisan config:cache
+    php  artisan  queue:restart
+ 
+ 
+ 
+ 
+ root@yjb:/home/ops/erp# cat wechat_web_online.sh 
+#!/bin/bash
+cd /home/ops/erp/wechat_web
+git pull origin master
+composer install
+yarn install
+php artisan migrate:web
+npm run dev
+
+
+
+
+www-fx-com@iZuf64j32bjnw9wtiaic8jZ:~/web$ cat /data/sh/wx_1fangxin_online.sh 
+#!/bin/bash
+##############################################
+#Author: hanye
+#Email:  hz7726@163.com
+#Last modified: 2018/01/30/17:38
+#Filename: wx_1fangxin_online.sh
+#Revision:  0.1
+#Description: 
+#crontab: * * * * * wx_1fangxin_online.sh
+#Website:   www.1fangxin.net
+#License: GPL
+##############################################
+Data="/home/www-fx-com/web"
+Time=`date +%Y%m%d%H%M`
+cd $Data
+git pull origin master
+composer install
+php artisan migrate:web
+if [ $? -eq 0 ]; then
+  yarn install
+  npm run dev
+else
+  exit 3
+fi
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+iZ25dx3d6zkZ# su - erp-fx-com
+erp-fx-com@iZ25dx3d6zkZ:~$ ssh -p 7080 erp@10.26.120.173 date
+Tue Oct 17 15:42:33 CST 2017
+erp-fx-com@iZ25dx3d6zkZ:~$ cd .ssh/
+erp-fx-com@iZ25dx3d6zkZ:~/.ssh$ ll  
+total 24
+-rw-r--r-- 1 erp-fx-com www 3543 Jun 12 09:56 authorized_keys
+-rw------- 1 erp-fx-com www 3243 Apr 25  2016 id_rsa
+-rw-r--r-- 1 erp-fx-com www  747 Apr 25  2016 id_rsa.pub
+-rw-r--r-- 1 erp-fx-com www 5972 Oct 17 11:20 known_hosts
+-rw-r--r-- 1 erp-fx-com www  399 Sep 10  2016 runninglee.pub
+erp-fx-com@iZ25dx3d6zkZ:~/.ssh$ cat id_rsa.pub 
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDFJufUzH20BSHxveyIORwWxA4qGScgrmTkO4/xbbW8Y440DYHriu14IOygelxfMk6CEJ03cPH9G5OI8tdB9xDxBnTtfpC+5gUkUffs1Zes8MDX5jGMSEXQ1N6wZSAEoJGMahYOKB1WwNJx52uS3L4Cy2T3lSdvXJ847j8CFRlgyyyHrr5Crcdga4n8TL7paObxLx+lKcCKoiu00iXKNw1IMICpehy54ehn1kgbHeqibR/BV8qvn0n3z3CQTpC7UiHbiiIUTBaqxlrS0CoJorHZPsjau3orPOT2ExlYmUJ1dqg4HgtiD9tC6qz96vxwBj8Gnh2Wxp0fgvFLi2m9+GlMDRjYFXjbFSrBtcRcFOQLC5Wrv0Kx2/l3E1NS8Ej5Vi0m9aNwG78FxonrkzgvRBC4/Jr/KOtBdN8YuvoVMiYKj5yBbo5IPvDEq9o4aHL9EVIQ== lihui870920@gmail.com
+
+
+root@fangxin-yun-server:/home/lnmp/src/php-7.1.6# su - erp
+erp@fangxin-yun-server:~$ cd ~/.ssh/
+erp@fangxin-yun-server:~/.ssh$ ll
+total 16
+-rw-r--r-- 1 erp erp 1491 Oct 17 11:21 authorized_keys
+-rw------- 1 erp erp 1675 Sep  7 14:36 id_rsa
+-rw-r--r-- 1 erp erp  404 Oct 17 11:21 id_rsa.pub
+-rw-r--r-- 1 erp erp  444 Sep  7 14:39 known_hosts
+erp@fangxin-yun-server:~/.ssh$ cat authorized_keys 
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDByUzN5Jc36gw8TqBZXDD+sFzSOcD30X5J2a2GwYg2Y6jOWU/DSfln5cjQZw6UkrUvmQ7PypY7PbqdWhCxEeznpmIT3drbtL4Efvq9xFAM0mFjS1nfHNJAae5GPPjaUaKkP/k9/igDUEN4cu9YAhD4HP25t3RNLQ0ZyDNwZCdfuKxtmouj1m1Y9fgeoPDN6BvA90Dp4CWtgE9V/hB40PC6DQ12wOAMXXfgfQt2B2E13snZFdm5qBm+Bxetkc2Nvm82UN7qVNeFtKxH9X0hmrffmUr1YV9HLXDOZly+eVHaFxZEdyjcvlx+4UHv9STztsP3jB1zVu8BkV8pIFUFdKLBg0eUDC8xpoYTy3clV2C6aVjFNf+t8HxVZVCzv4e31zmODSZfKPzD9OURLg0kf6jNBs4PeG6BgLJDDIh3RYdBHapHc5pr0iXgeSPT+dvRkoAw== me@zhuzhichao.com
+
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDFJufUzH20BSHxveyIORwWxA4qGScgrmTkO4/xbbW8Y440DYHriu14IOygelxfMk6CEJ03cPH9G5OI8tdB9xDxBnTtfpC+5gUkUffs1Zes8MDX5jGMSEXQ1N6wZSAEoJGMahYOKB1WwNJx52uS3L4Cy2T3lSdvXJ847j8CFRlgyyyHrr5Crcdga4n8TL7paObxLx+lKcCKoiu00iXKNw1IMICpehy54ehn1kgbHeqibR/BV8qvn0n3z3CQTpC7UiHbiiIUTBaqxlrS0CoJorHZPsjau3orPOT2ExlYmUJ1dqg4HgtiD9tC6qz96vxwBj8Gnh2Wxp0fgvFLi2m9+GlMDRjYFXjbFSrBtcRcFOQLC5Wrv0Kx2/l3E1NS8Ej5Vi0m9aNwG78FxonrkzgvRBC4/Jr/KOtBdN8YuvoVMiYKj5yBbo5IPvDEq9o4aHL9EVIQ== lihui870920@gmail.com
+
+ssh -p 7080 erp@10.26.120.173 "/home/erp/deploy_shell/beijing_online.sh"  （把 erp-fx-com 的公钥加到对方的erp 用户下的 authorized_keys 文件下
+ 
+ root@debian45:/home/ops/erp# cat supvisor_status.sh 
+#!/bin/bash
+#----------------------------
+#name:    supvisor_status
+#version: 1.0
+#code:     han
+#----------------------------
+qa1="/home/ops/erp/erp"
+test1="/home/ops/erp/erptest"
+ps -ef |grep -v grep |grep "supervisord" > /dev/null
+if [ $? -eq 0 ]; then
+  echo "supervisord is exist"
+else
+  mkdir	 $qa1 $test1 -p
+  chmod -R 777 $qa1/ $test1/ 
+  chown -R ops:ops $qa1/ $test1/
+   /etc/init.d/supervisor restart
+  echo "supervisord is not exists"
+fi
+
+
+
+注意：jenkins 的运行用户要修改为ops
+
+
+jenkins_date="/home/jenkins/ops/workspace/fx_erp_release"
+erp_date="/home/ops/erp/erptest"
+cp -fr $jenkins_date/* $erp_date/
+#rm -fr $jenkins_date/* 
+cd $erp_date/
+composer install
+gulp
+#sudo chmod -R 777 $erp_date
+    #php  artisan   migrate
+    expect /home/ops/migrate.sh
+    php artisan config:cache
+    php  artisan  queue:restart

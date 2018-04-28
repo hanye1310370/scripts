@@ -1,0 +1,529 @@
+准备： 
+中间件：192.168.1.98 ——->oneproxy（本次实验所用版本是5.8.5） 
+mysql主：192.168.1.51 ——->master 
+mysql从：192.168.1.121 ——->slave 
+为方便实验，三台机都关闭 防火墙和selinux 
+开始之前，需要将master和slave之间主从配置好，这不是本文的重点，下面会有简单的操作，，如要详细的过程，可移步至：http://blog.csdn.net/weixin_37998647/article/details/76599255
+
+一、主从复制搭建与检查：
+
+配置master：
+
+[root@localhost ~]# vim /etc/my.cnf
+ 19 # read_rnd_buffer_size = 2M
+ 20 datadir=/var/lib/mysql
+ 21 socket=/var/lib/mysql/mysql.sock
+ 22 server-id=1
+ 23 log-bin=mysql-bin
+ 24
+ 25 # Disabling symbolic-links is recommended to prevent assorted security ri
+    sks
+ 26 symbolic-links=0
+ 27
+ 28 log-error=/var/log/mysqld.log
+ 29 pid-file=/var/run/mysqld/mysqld.pid
+ [root@localhost ~]# /etc/init.d/mysqld restart
+Stopping mysqld:                                           [  OK  ]
+Starting mysqld:                                           [  OK  ]
+
+配置slave：
+
+[root@localhost ~]# vim /etc/my.cnf
+ 19 # read_rnd_buffer_size = 2M
+ 20 datadir=/var/lib/mysql
+ 21 socket=/var/lib/mysql/mysql.sock
+ 22 server-id=2
+ 23 log-bin=mysql-bin
+ 24
+ 25 # Disabling symbolic-links is recommended to prevent assorted security ri
+    sks
+ 26 symbolic-links=0
+ 27
+ 28 log-error=/var/log/mysqld.log
+ 29 pid-file=/var/run/mysqld/mysqld.pid
+ [root@localhost ~]# /etc/init.d/mysqld restart
+Stopping mysqld:                                           [  OK  ]
+Starting mysqld:                                           [  OK  ]
+
+配置文件修改了之后要重启或者重新加载服务，这是常识。
+
+在master上授权：
+
+[root@localhost ~]# mysql -uroot -p
+
+mysql> grant all privileges on *.* to 'root'@'%' identified by 'abc123';
+ERROR 1819 (HY000): Your password does not satisfy the current policy requirements
+mysql> set global validate_password_policy=0;
+Query OK, 0 rows affected (0.06 sec)
+
+mysql> set global validate_password_length=6;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> grant all privileges on *.* to 'root'@'%' identified by 'abc123';
+Query OK, 0 rows affected, 1 warning (0.10 sec)
+mysql> show master status ;
++------------------+----------+--------------+------------------+-------------------+
+| File             | Position | Binlog_Do_DB | Binlog_Ignore_DB | Executed_Gtid_Set |
++------------------+----------+--------------+------------------+-------------------+
+| mysql-bin.000001 |      434 |              |                  |                   |
++------------------+----------+--------------+------------------+-------------------+
+1 row in set (0.00 sec)
+
+在slave上指定master：
+
+[root@localhost ~]# mysql -u root -p
+
+mysql> change master to master_host='192.168.1.51',master_user='root',master_ppassword='abc123',master_log_file='mysql-bin.000001',master_log_pos=434;
+Query OK, 0 rows affected, 2 warnings (0.07 sec)
+mysql> start slave ;
+Query OK, 0 rows affected (0.02 sec)
+
+mysql> show slave status \G;
+*************************** 1. row ***************************
+               Slave_IO_State: Waiting for master to send event
+                  Master_Host: 192.168.1.51
+                  Master_User: root
+                  Master_Port: 3306
+                Connect_Retry: 60
+              Master_Log_File: mysql-bin.000001
+          Read_Master_Log_Pos: 434
+               Relay_Log_File: localhost-relay-bin.000002
+                Relay_Log_Pos: 320
+        Relay_Master_Log_File: mysql-bin.000001
+             Slave_IO_Running: Yes
+            Slave_SQL_Running: Yes
+
+看都上面两个yes （Slave_IO_Running: Yes 和 Slave_IO_Running: Yes） 主从复制就完成啦！
+
+稍稍检查一下主从是否生效： 
+master上插入数据：
+
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| sys                |
++--------------------+
+4 rows in set (0.06 sec)
+
+mysql> create database test;
+Query OK, 1 row affected (0.04 sec)
+mysql> use test ;
+Database changed
+mysql> Create table my_range(id int not null primary key, ip int, name varchar(32));
+Query OK, 0 rows affected (0.08 sec)
+
+mysql> show tables;
++----------------+
+| Tables_in_test |
++----------------+
+| my_range       |
++----------------+
+1 row in set (0.01 sec)
+mysql> insert into my_range values (1,2,'hello');
+Query OK, 1 row affected (0.02 sec)
+
+mysql> select * from my_range;
++----+------+-------+
+| id | ip   | name  |
++----+------+-------+
+|  1 |    2 | hello |
++----+------+-------+
+1 row in set (0.00 sec)
+
+slave上查看是否已经同步：
+
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| sys                |
+| test               |
++--------------------+
+5 rows in set (0.05 sec)
+
+mysql> use test;
+Reading table information for completion of table and column names
+You can turn off this feature to get a quicker startup with -A
+
+Database changed
+mysql> show tables;
++----------------+
+| Tables_in_test |
++----------------+
+| my_range       |
++----------------+
+1 row in set (0.00 sec)
+
+mysql> select * from my_range;
++----+------+-------+
+| id | ip   | name  |
++----+------+-------+
+|  1 |    2 | hello |
++----+------+-------+
+1 row in set (0.00 sec)
+
+没有问题，从上没有插入数据，但是有了主上的数据，证明主从复制是没有问题的。
+
+以上都是准备工作。就可以开始啦！
+
+master创建用户master并授权：
+
+mysql> create user 'master'@'%' identified by 'master';
+Query OK, 0 rows affected (0.02 sec)
+
+mysql> grant all privileges on test.* to 'master'@'%';
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> flush privileges;
+Query OK, 0 rows affected (0.01 sec)
+
+slave 上创建用户并授权：
+
+mysql> create user 'slaves'@'%' identified by 'slaves';
+Query OK, 0 rows affected (0.54 sec)
+
+mysql> grant all privileges on test.* to 'slaves'@'%';
+Query OK, 0 rows affected (0.45 sec)
+
+mysql> flush privileges;
+Query OK, 0 rows affected (0.68 sec)
+
+二、安装部署中间件： 
+oneproxy 用的是5.8.5的版本：百度网盘地址： 
+https://pan.baidu.com/s/1dECCkq1
+
+[root@localhost ~]#Wget http://www.onexsoft.com/software/oneproxy-rhel5-linux64-v5.8.5-ga.tar.gz       ##这官方地址偶尔会用不了
+[root@localhost ~]# tar -zxf oneproxy-rhel5-linux64-v5.8.5-ga.tar.gz -C /usr/local/
+[root@localhost ~]# cd /usr/local/oneproxy/
+[root@localhost oneproxy]# ls
+bin   demo.sh  oneproxy.service  testadmin.sql       testproxy.sql
+conf  log      README            testautocommit.sql  trantest.sql
+
+修改启动脚本的目录:
+
+[root@localhost oneproxy]# vim demo.sh
+
+#/bin/bash
+#
+export ONEPROXY_HOME=/usr/local/oneproxy
+
+# valgrind --leak-check=full \
+  ${ONEPROXY_HOME}/bin/oneproxy --defaults-file=${ONEPROXY_HOME}/conf/proxy.conf
+[root@localhost oneproxy]# chmod +x demo.sh
+[root@localhost oneproxy]# vim oneproxy.service
+
+#!/bin/bash
+# chkconfig: - 30 21
+# description: OneProxy service.
+# Source Function Library
+. /etc/init.d/functions
+
+# OneProxy Settings
+ONEPROXY_HOME=/usr/local/oneproxy
+
+启动oneproxy
+
+[root@localhost oneproxy]# ls
+bin  conf  demo.sh  log  oneproxy.service  README  testadmin.sql  testautocommit.sql  testproxy.sql  trantest.sql
+[root@localhost oneproxy]# ./demo.sh
+[root@localhost oneproxy]# cp oneproxy.service /etc/init.d/oneproxy
+[root@localhost oneproxy]# ./oneproxy.service start
+Starting OneProxy ...                                      [  OK  ]
+[root@localhost oneproxy]# ps -ef | grep oneproxy | grep -v grep
+root      14100      1  0 19:20 ?        00:00:00 /usr/local/oneproxy/bin/oneproxy --defaults-file=/usr/local/oneproxy/conf/proxy.conf
+root      14101  14100  8 19:20 ?        00:00:04 /usr/local/oneproxy/bin/oneproxy --defaults-file=/usr/local/oneproxy/conf/proxy.conf
+1
+2
+3
+4
+5
+6
+7
+8
+9
+看到有连个进程就启动成功了
+
+然后配置/usr/local/oneproxy/conf/proxy.conf
+
+首先拿到在master和slave上创建的用户的加密密码，加密工具在/usr/local/oneproxy/bin 下：
+
+[root@localhost oneproxy]# ls
+bin   demo.sh  oneproxy.service  testadmin.sql       testproxy.sql
+conf  log      README            testautocommit.sql  trantest.sql
+[root@localhost oneproxy]# cd bin/
+[root@localhost bin]# ls
+mysqlpwd  oneproxy
+[root@localhost bin]# pwd
+/usr/local/oneproxy/bin
+[root@localhost bin]# ./mysqlpwd master
+E1C605764FCBF11931184DBA2D6B39778B846EBD
+[root@localhost bin]# ./mysqlpwd slaves
+4387CBA8527F094C4B90204C48604502E1790538
+
+[root@localhost conf]# pwd
+/usr/local/oneproxy/conf
+[root@localhost conf]# vim proxy.conf
+[oneproxy]
+keepalive     = 1
+event-threads = 4
+log-file      = log/oneproxy.log
+pid-file      = log/oneproxy.pid
+lck-file      = log/oneproxy.lck
+
+mysql-version            = 5.7.20
+proxy-address            = :3307
+admin-address            = :4040
+proxy-httpserver         = :8080
+#proxy-master-addresses.1 = 202.66.5.60:3306@pxc
+proxy-master-addresses.1 = 192.168.1.51:3306@AA
+
+proxy-slave-addresses.1  = 192.168.1.121:3306@AA
+#proxy-slave-addresses.2  = 192.168.1.62:3307@pxc
+
+proxy-user-list.1          = master/E1C605764FCBF11931184DBA2D6B39778B846EBD@test
+proxy-user-list.2          = slaves/4387CBA8527F094C4B90204C48604502E1790538@test
+
+
+proxy-part-template      = conf/template.txt
+proxy-part-tables.1      = conf/part.txt
+proxy-part-tables.2      = conf/part2.txt
+proxy-charset            = utf8_general_ci
+proxy-group-security     = AA:0
+proxy-group-policy       = AA:Read-balance
+
+proxy-secure-client      = 127.0.0.1
+
+#remote-address           = 192.168.1.83:4041
+#vip-address              = 192.168.1.102/em2:0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+重启oneproxy：（先杀掉守护进程。然后重启）
+
+[root@localhost oneproxy]# ps -ef | grep oneproxy | grep -v grep
+root      14100      1  0 19:20 ?        00:00:00 /usr/local/oneproxy/bin/oneproxy --defaults-file=/usr/local/oneproxy/conf/proxy.conf
+root      14101  14100  8 19:20 ?        00:00:04 /usr/local/oneproxy/bin/oneproxy --defaults-file=/usr/local/oneproxy/conf/proxy.conf
+[root@localhost oneproxy]# kill -9 14100 14101
+[root@localhost oneproxy]# ps -ef | grep oneproxy | grep -v grep
+[root@localhost oneproxy]# ./demo.sh
+[root@localhost oneproxy]# ./oneproxy.service restart
+Stopping OneProxy ...                                      [  OK  ]
+Starting OneProxy ...                                      [  OK  ]
+[root@localhost oneproxy]# ps -ef | grep oneproxy | grep -v grep
+root      14172      1  0 19:24 ?        00:00:00 /usr/local/oneproxy/bin/oneproxy --defaults-file=/usr/local/oneproxy/conf/proxy.conf
+root      14173  14172  7 19:24 ?        00:00:00 /usr/local/oneproxy/bin/oneproxy --defaults-file=/usr/local/oneproxy/conf/proxy.conf
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+重启master的mysql，重启slave的mysql
+
+登录oneproxy： 
+在中间件上也要安装mysql命令yum install -y mysql 就可以。我已经装了其他版本，就不用装了。
+
+[root@localhost ~]# mysql -uadmin -h127.0.0.1 -P4040 -pOneProxy
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 104
+Server version: 5.7.20 OneProxy-Community-Admin-5.8.5 (OneXSoft)
+
+Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> list backend;
++------+--------------------+------+--------+--------+----------+-------+-------+------+------+-------+-------+-------+------+------+---------+
+| INDX | ADDRESS            | TYPE | STATUS | MARKUP | REQUESTS | POWER | GROUP | IS_M | IS_S | MFile | DFile | RFile | IO   | SQL  | Seconds |
++------+--------------------+------+--------+--------+----------+-------+-------+------+------+-------+-------+-------+------+------+---------+
+|    1 | 127.0.0.1:3307     | RW   | UP     |      0 |        0 |     1 |       | No   | No   | NULL  | NULL  | NULL  | NULL | NULL |    NULL |
+|    2 | 192.168.1.51:3306  | RW   | UP     |      3 |        0 |     1 | AA    | No   | No   | NULL  | NULL  | NULL  | NULL | NULL |    NULL |
+|    3 | 192.168.1.121:3306 | RO   | UP     |      3 |        0 |     1 | AA    | No   | No   | NULL  | NULL  | NULL  | NULL | NULL |    NULL |
++------+--------------------+------+--------+--------+----------+-------+-------+------+------+-------+-------+-------+------+------+---------+
+3 rows in set (0.00 sec)
+
+status 这一列要是‘UP’才说明正常。 
+如果不是UP可能的原因有几种：1、master和slave的授权有问题，2、防火墙selinux 。3、配置文件有错。
+
+配置中间件配置文件：
+
+[root@localhost conf]# pwd
+/usr/local/oneproxy/conf
+[root@localhost conf]# vim part2.txt
+[
+   {
+        "table"   : "my_range",
+        "pkey"    : "id",
+        "type"    : "int",
+        "method"  : "range",
+        "partitions":
+           [
+               { "name" : "my_range_0", "group": "AA", "value" : "100000" },
+               { "name" : "my_range_1", "group": "AA", "value" : "200000" },
+               { "name" : "my_range_2", "group": "AA", "value" : "300000" },
+               { "name" : "my_range_3", "group": "AA", "value" : null     }
+           ]
+   }
+]
+
+配置完了仍然要杀死守护进程之后重启。
+
+三、测试分表
+
+注意：（敲黑板，反复敲黑板）
+
+在中间件上以master用户（master上授权过这个用户）登录本机虚拟的数据库，创建表，插入数据：（插入数据都是在oneproxy这台机器连接master这台机的master用户登录插入的。） 
+最最重要的一点是：oneproxy上会虚拟出来一个表，对数据的DML、DQL、DDL操作都在这张表上。
+
+只有授权（DCL）操作，是开始就在master上做的。
+
+[root@localhost conf]# mysql -umaster -h 192.168.1.98 -P3307 -p
+
+mysql> Create table my_range (id int not null primary key, col2 int, col3 varchar(32));
+Query OK, 0 rows affected (0.06 sec)
+
+mysql> Create table my_range_0 (id int not null primary key, col2 int, col3 varchar(32));
+Query OK, 0 rows affected (0.07 sec)
+
+mysql> Create table my_range_1 (id int not null primary key, col2 int, col3 varchar(32));
+Query OK, 0 rows affected (0.05 sec)
+
+mysql> Create table my_range_2 (id int not null primary key, col2 int, col3 varchar(32));
+Query OK, 0 rows affected (0.08 sec)
+
+mysql> Create table my_range_3 (id int not null primary key, col2 int, col3 varchar(32));
+Query OK, 0 rows affected (0.06 sec)
+
+mysql> show tables;
++------------------------+
+| Tables_in_test         |
++------------------------+
+| my_range               |
+| my_range_0             |
+| my_range_1             |
+| my_range_2             |
+| my_range_3             |
++------------------------+
+5 rows in set (0.01 sec)
+
+mysql> select * from my_range;
+Empty set (0.01 sec)
+
+mysql> select * from my_range_0;
+Empty set (0.00 sec)
+
+mysql> select * from my_range_1;
+Empty set (0.01 sec)
+
+mysql> select * from my_range_2;
+Empty set (0.00 sec)
+
+mysql> select * from my_range_3;
+Empty set (0.00 sec)
+
+mysql> insert into my_range (id, col2, col3) values (100, 1, 'hello');
+Query OK, 1 row affected (0.03 sec)
+
+mysql> insert into my_range (id, col2, col3) values (100100, 2, 'hello a');
+Query OK, 1 row affected (0.01 sec)
+
+mysql> insert into my_range (id, col2, col3) values (200100, 2, 'hello b');
+Query OK, 1 row affected (0.02 sec)
+
+mysql> insert into my_range (id, col2, col3) values (300100, 3, 'hello c');
+Query OK, 1 row affected (0.01 sec)
+
+mysql> select * from my_range;
++--------+------+---------+
+| id     | col2 | col3    |
++--------+------+---------+
+|    100 |    1 | hello   |
+| 100100 |    2 | hello a |
+| 200100 |    2 | hello b |
+| 300100 |    3 | hello c |
++--------+------+---------+
+4 rows in set (0.01 sec)
+
+mysql> select * from my_range_0;
++-----+------+-------+
+| id  | col2 | col3  |
++-----+------+-------+
+| 100 |    1 | hello |
++-----+------+-------+
+1 row in set (0.01 sec)
+
+mysql> select * from my_range_1;
++--------+------+---------+
+| id     | col2 | col3    |
++--------+------+---------+
+| 100100 |    2 | hello a |
++--------+------+---------+
+1 row in set (0.00 sec)
+
+mysql> select * from my_range_2;
++--------+------+---------+
+| id     | col2 | col3    |
++--------+------+---------+
+| 200100 |    2 | hello b |
++--------+------+---------+
+1 row in set (0.00 sec)
+
+mysql> select * from my_range_3;
++--------+------+---------+
+| id     | col2 | col3    |
++--------+------+---------+
+| 300100 |    3 | hello c |
++--------+------+---------+
+1 row in set (0.01 sec)
+
+结果出来了，在总表上插入数据，会跑自动到分表里面去。

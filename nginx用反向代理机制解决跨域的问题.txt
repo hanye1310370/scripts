@@ -1,0 +1,89 @@
+什么是跨域？
+使用js获取数据时，涉及到的两个url只要协议、域名、端口有任何一个不同，都被当作是不同的域，相互访问就会有跨域问题。
+跨域，指的是浏览器不能执行其他网站的脚本。它是由浏览器的同源策略造成的，是浏览器施加的安全限制。
+所谓同源是指，域名，协议，端口均相同，不明白没关系，举个栗子：
+
+http://www.123.com/index.html 调用 http://www.123.com/server.php （非跨域）
+
+http://www.123.com/index.html 调用 http://www.456.com/server.php （主域名不同:123/456，跨域）
+
+http://abc.123.com/index.html 调用 http://def.123.com/server.php （子域名不同:abc/def，跨域）
+
+http://www.123.com:8080/index.html 调用 http://www.123.com:8081/server.php （端口不同:8080/8081，跨域）
+
+http://www.123.com/index.html 调用 https://www.123.com/server.php （协议不同:http/https，跨域）
+
+请注意：localhost和127.0.0.1虽然都指向本机，但也属于跨域。
+
+浏览器执行javascript脚本时，会检查这个脚本属于哪个页面，如果不是同源页面，就不会被执行。
+
+背景
+
+大家看了上面的跨域介绍，相信都大致了解所谓的跨域访问。正好我们公司这两天就有这种需求，公司前端工程师提出需要跨域访问，需求如下：
+
+nginx服务器：172.18.18.75
+
+h5服务器：172.18.18.76
+
+java服务器：172.18.18.77
+
+新增加域名：www.oilup.com  指向 nginx服务器（172.18.18.75）
+
+域名指向的静态目录：/usr/local/nginx/html/web/ 目录放在nginx服务器（172.18.18.75）
+
+
+[root@localhost web]# pwd
+/usr/local/nginx/html/web
+[root@localhost web]# ls
+css          handlebars  images      init.html  package.json  README.md
+gulpfile.js  html        index.html  js         pc.zip        template
+
+当访问域名http://www.oilup.com/  调用  http://172.18.18.76:7080
+
+当访问域名http://www.oilup.com/  调用  http://172.18.18.77:8888
+
+如何解决
+
+进入nginx服务器，配置nginx.conf：
+
+
+#vim /usr/local/nginx/conf/nginx.conf
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+    sendfile        on;
+    #增加下面3行
+    add_header Access-Control-Allow-Origin *;
+    add_header Access-Control-Allow-Headers X-Requested-With;
+    add_header Access-Control-Allow-Methods GET,POST,OPTIONS;
+    ......
+    其它http项的配置省略
+
+    
+    #配置server，用location匹配并反向代理proxy_pass
+    server {
+        listen       80;
+        server_name  www.oilup.com;
+        
+        location / {
+           root   html/web;                   
+          index  index.html index.htm;
+        }
+        
+        location  /h5/ {                
+          rewrite  ^.+h5/?(.*)$ /$1 break; 
+          include  uwsgi_params;
+          proxy_pass   http://172.18.18.76:7080;
+        }
+        
+        location  /javaes/ {
+          rewrite  ^.+javaes/?(.*)$ /$1 break;
+          include  uwsgi_params;
+          proxy_pass   http://172.18.18.77:8888;
+        }
+}
+
+
+重启nginx服务:
+
+/usr/local/nginx/sbin/nginx -s reload

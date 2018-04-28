@@ -1,0 +1,12 @@
+[ERR] Node 127.0.0.1:7000 is not empty. Either the node already knows other nodes (check with CLUSTE
+标签： redis
+2017-04-06 16:28 1074人阅读 评论(0) 收藏 举报
+ 分类： redis（6）  
+版权声明：本文为博主原创文章，未经博主允许不得转载。
+创建集群：
+./redis-trib.rb  create --replicas 1 127.0.0.1:7000 127.0.0.1:7001 127.0.0.1:7002 127.0.0.1:7003 127.0.0.1:7004 127.0.0.1:7005 
+报错：
+[ERR] Node 127.0.0.1:7000 is not empty. Either the node already knows other nodes (check with CLUSTER NODES) or contains some key in database 0.
+
+解决：
+删除生成的配置文件nodes.conf，如果不行则说明现在创建的结点包括了旧集群的结点信息，需要删除redis的持久化文件后再重启redis，比如：appendonly.aof、dump.rdb

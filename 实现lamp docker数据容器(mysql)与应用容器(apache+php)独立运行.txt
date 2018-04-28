@@ -1,0 +1,341 @@
+在我之前写的文章中已经实现了在独立的容器中运行apache和mysql。 
+请参阅： 
+《创建带Apache服务的Centos Docker镜像》 
+《详解如何使用DockerHub官方的mysql镜像生成容器》 
+但是在实际的应用过程中，很少有让这二个服务单独运行的，最常见的应用是lamp环境，将apache、php和mysql结合到一起。在实际生产环境中，除非访问量不是很大的站点，一般都会将mysql放到一台服务器上，apache+php放到另外一台服务器上，以提高性能。 
+现在我就分步骤演示这个环境的搭建，搭建后将通过安装Discuz结合数据容器与应用容器，实现lamp，并测试是否工作正常。 
+一、运行mysql容器 
+mysql的docker镜像以Docker Hub提供的官方镜像为基础，来生成数据容器。 
+1、在宿主机上建立映射到容器的mysql数据目录
+
+mkdir /mysql_lamp
+1
+2、建立容器 
+2.1、生成容器
+
+docker run -d -e mysqld -e MYSQL_ROOT_PASSWORD=147258 -e MYSQL_USER=steven -e MYSQL_PASSWORD=147258  -e MYSQL_DATABASE=discuz -v /mysql_lamp:/var/lib/mysql --name mysql_db  mysql
+1
+命令中的参数除了name外，我在《详解如何使用DockerHub官方的mysql镜像生成容器》有详细的说明。
+
+name 是给新生成的容器命名，起一个很好记忆的名字。如果不指定系统将会自动生成。
+
+2.2、查看生成的容器：
+
+[root@localhost ~]# docker ps -a
+CONTAINER ID        IMAGE               COMMAND                CREATED             STATUS              PORTS               NAMES
+d427e7c85505        mysql               "/entrypoint.sh mysq   5 seconds ago       Up 4 seconds        3306/tcp            mysql_db
+1
+2
+3
+2.3、查看数据目录下是否生成相应的文件：
+
+[root@localhost ~]# ll /mysql_lamp/
+总用量 110608
+-rw-rw---- 1 999 999       56 10月 18 13:34 auto.cnf
+drwx------ 2 999 999     4096 10月 18 13:34 discuz
+-rw-rw---- 1 999 999 12582912 10月 18 13:35 ibdata1
+-rw-rw---- 1 999 999 50331648 10月 18 13:35 ib_logfile0
+-rw-rw---- 1 999 999 50331648 10月 18 13:34 ib_logfile1
+drwx------ 2 999 999     4096 10月 18 13:34 mysql
+drwx------ 2 999 999     4096 10月 18 13:34 performance_schema
+1
+2
+3
+4
+5
+6
+7
+8
+9
+一切正常！
+
+二、生成apache+php的镜像 
+这里的基础镜像以《创建带Apache服务的Centos Docker镜像》介绍的镜像为基础。 
+1、查看现有镜像
+
+[root@localhost ~]# docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
+apache_dockerfile   centos              f8f30b4a0ee8        4 days ago          440 MB
+mysql               latest              e206c8d4ffcf        4 days ago          324.3 MB
+sshd                dockerfile          411d5fb16366        5 days ago          278 MB
+centos              latest              0f73ae75014f        5 weeks ago         172.3 MB
+1
+2
+3
+4
+5
+6
+2、以生成临时容器，安装php
+
+[root@localhost ~]# docker run -d -P apache_dockerfile:centos
+1
+查看新生成的apache容器:
+
+[root@localhost ~]# docker ps -a
+CONTAINER ID        IMAGE                      COMMAND                CREATED             STATUS              PORTS                                          NAMES
+aea12b125d33        apache_dockerfile:centos   "/usr/local/sbin/run   5 seconds ago       Up 5 seconds        0.0.0.0:32794->22/tcp, 0.0.0.0:32793->80/tcp   condescending_perlman
+d427e7c85505        mysql                      "/entrypoint.sh mysq   8 minutes ago       Up 8 minutes        3306/tcp                                       mysql_db       
+1
+2
+3
+4
+3、进入容器：
+
+ssh localhost -p 32794
+1
+4、mysql 
+编译PHP时需要用到mysql进行模块编译，同时在php模块连接数据库时也需要用到mysql相关的模块，所以需要安装。
+
+#下载已编译文件包
+wget http://mirrors.sohu.com/mysql/MySQL-5.6/mysql-5.6.27-linux-glibc2.5-x86_64.tar.gz
+
+#解压
+tar -zxvf mysql-5.6.27-linux-glibc2.5-x86_64.tar.gz
+
+#将解压后的文件移动到指定的目录/usr/local并重命名为：mysql
+mv ./mysql-5.6.27-linux-glibc2.5-x86_64 /usr/local/mysql
+1
+2
+3
+4
+5
+6
+7
+8
+由于我们的mysql数据服务在另外的容器中运行，因此，并不需要安装和启动mysql，只需要解压并复制到/usrl/local/mysql即可。
+
+5、编译安装php 
+5.1、编译前的准备
+
+cd /usr/local/src
+#下载源码包
+wget http://cn2.php.net/distributions/php-5.6.14.tar.gz
+#解压源码包
+tar -zxvf php-5.6.14.tar.gz
+cd php-5.3.28
+#下载软件依赖
+yum -y install epel-release
+yum install -y make perl perl-devel libxml2-devel openssl-devel bzip2-devel libjpeg libjpeg-devel libpng-devel freetype-devel libmcrypt-devel
+1
+2
+3
+4
+5
+6
+7
+8
+9
+由于我之前的apache docker 镜像里没有安装perl，如果这时要开始编译就会报错：
+
+Sorry, I cannot run apxs.  Possible reasons follow:
+
+1. Perl is not installed
+2. apxs was not found. Try to pass the path using --with-apxs2=/path/to/apxs
+3. Apache was not built using --enable-so (the apxs usage page is displayed)
+1
+2
+3
+4
+5
+解决方案为：
+
+vi /usr/local/apache2/bin/apxs
+1
+将
+
+#!/replace/with/path/to/perl/interpreter -w
+1
+替换为：
+
+#!/usr/bin/perl -w
+1
+5.2、编译安装PHP
+
+ ./configure   --prefix=/usr/local/php   --with-apxs2=/usr/local/apache2/bin/apxs   --with-config-file-path=/usr/local/php/etc   --with-mysql=/usr/local/mysql   --with-libxml-dir   --with-gd   --with-jpeg-dir   --with-png-dir   --with-freetype-dir   --with-iconv-dir   --with-zlib-dir   --with-bz2   --with-openssl   --with-mcrypt   --enable-soap   --enable-gd-native-ttf   --enable-mbstring   --enable-sockets   --enable-exif   --disable-ipv6 
+
+make
+
+make install
+1
+2
+3
+4
+5
+查看php是否编译了apache支持文件
+
+[root@aea12b125d33 php-5.6.14]# ll /usr/local/apache2/modules/libphp5.so
+-rwxr-xr-x 1 root root 36555844 Oct 18 07:02 /usr/local/apache2/modules/libphp5.so
+1
+2
+OK！
+
+6、配置apache
+
+vi /usr/local/apache2/conf/httpd.conf
+1
+#找到:
+AddType application/x-gzip .gz .tgz
+#在该行下面添加:
+AddType application/x-httpd-php .php
+
+#找到:
+<IfModule dir_module>
+    DirectoryIndex index.html
+</IfModule>
+#将该行改为:
+<IfModule dir_module>
+    DirectoryIndex index.html index.htm index.php
+</IfModule>
+
+#找到:
+#ServerName www.example.com:80
+#修改为:
+ServerName localhost:80
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+更新配置文件使之生效
+
+ /usr/local/apache2/bin/apachectl -k graceful
+1
+新建测试文件:
+
+ vi /usr/local/apache2/htdocs/1.php
+1
+内容如下：
+
+<?php
+        echo phpinfo();
+?>
+1
+2
+3
+测试：
+
+ curl localhost/1.php
+1
+如果出现php配置信息就说明解析成功。
+
+7、生成镜像 
+7.1、清理临时容器里的文件 
+在生成镜像之前需要在容器里清理一下之前安装留下的文件，包括/usr/local/src目录下面的源码、/usr/local/php目录（这个目录只在编译PHP模块时用到，编译过后就没有用了）
+
+7.2、查看刚刚配置的容器信息
+
+
+[root@localhost ~]# docker ps -a
+CONTAINER ID        IMAGE                      COMMAND                CREATED             STATUS              PORTS                                          NAMES
+aea12b125d33        apache_dockerfile:centos   "/usr/local/sbin/run   About an hour ago   Up 10 minutes       0.0.0.0:32796->22/tcp, 0.0.0.0:32795->80/tcp   condescending_perlman
+d427e7c85505        mysql                      "/entrypoint.sh mysq   About an hour ago   Up About an hour    3306/tcp                                       mysql_db 
+1
+2
+3
+4
+5
+7.3、根据容器ID生成镜像：
+
+docker commit aea12 apache_php
+1
+查看刚刚生成的容器信息：
+
+[root@localhost ~]# docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED              VIRTUAL SIZE
+apache_php          latest              d5b82ef788ed        About a minute ago   800 MB
+apache_dockerfile   centos              f8f30b4a0ee8        4 days ago           440 MB
+mysql               latest              e206c8d4ffcf        4 days ago           324.3 MB
+1
+2
+3
+4
+5
+三、安装Discuz! 
+能过以上二步操作，新建了数据容器mysql_db，也新建了apache+php的镜像apache_php。之所以没有立即新建apache_php的容器，是因为还需要一些准备工作：下载Discuz源码包到本地文件夹，在生成apache_php容器时映射到容器的目录下。通过Discuz，就完成了数据容器与应用容器的结合，形成了完整的lamp架构。 
+通常我们会将代码和数据放到容器外的本地主机的目录里进行存放，一方面是保证数据安全，便于管理，另一方面也是出于性能方面的考虑。
+
+1、获得Discuz源码包，并解压到指定目录 
+在宿主机上新建一个目录
+
+mkdir /discuz
+cd /discuz
+1
+2
+下载源码包
+
+wget http://download2.comsenz.com/DiscuzX/3.2/Discuz_X3.2_SC_UTF8.zip
+1
+解压
+
+yum -y install unzip
+unzip Discuz_X3.2_SC_UTF8.zip
+mv upload/* .
+1
+2
+3
+2、新建apache_php容器，并连接mysql_db容器
+
+docker run -d -p 2222:22 -p 8000:80  --name web --link mysql_db:mysql_db -v /discuz:/usr/local/apache2/htdocs apache_php  /usr/local/sbin/run.sh
+1
+命令说明:
+
+分别开放容器的22和80端口宿主机的2222和8000端口；
+指定新生成的容器的名称为：“web”；
+将mysql_db容器连接到新生成的容器上；
+将本地磁盘目录/discuz映射到容器的/usr/local/apache2/htdocs目录；
+生成容器后运行指定角本。
+1
+2
+3
+4
+5
+查看新生成的容器：
+
+[root@localhost discuz]# docker ps -a
+CONTAINER ID        IMAGE                      COMMAND                CREATED             STATUS              PORTS                                          NAMES
+79d56e19f981        apache_php                 "/usr/local/sbin/run   14 minutes ago      Up 14 minutes       0.0.0.0:2222->22/tcp, 0.0.0.0:8000->80/tcp     web          
+aea12b125d33        apache_dockerfile:centos   "/usr/local/sbin/run   2 hours ago         Up 44 minutes       0.0.0.0:32796->22/tcp, 0.0.0.0:32795->80/tcp   condescending_perlman
+d427e7c85505        mysql                      "/entrypoint.sh mysq   2 hours ago         Up 2 hours          3306/tcp                                       mysql_db
+1
+2
+3
+4
+5
+3、在浏览器里运行：本机IP：8000 
+正常会出现Discuz的安装界面。 
+Discuz安装在这里无须多做说明，只有二个地方的操作需要注意 
+第一，安装程序会提示一些目录的权限不正确，需要修改，这时需要进入窗口更改所提示的文件夹权限。
+
+进入容器
+
+ docker exec -it 79d56 /bin/bash
+1
+修改权限
+
+cd /usr/local/apache2/htdocs
+chown -R daemon:daemon ./config ./data ./uc_client ./uc_server
+1
+2
+3
+第二、连接数据库 
+这里写图片描述 
+如上图： 
+数据库服务器:填写新建apache_php容器时连接数据窗口的alias ，即mysql_db 
+数据库名:填写在新建数据容器时新建的数据库，即discuz 
+用户名和密码，也是在新建数据容器时指定的root或者新建的用户的用户名和密码
+
+最后，如果以上操作无误的话会顺利完成Discuz的安装，进入首页。同时也表明我们已经实现了独立运行数据容器与应用窗口的架构。

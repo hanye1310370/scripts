@@ -1,0 +1,327 @@
+Tomacat服务器是一个免费的开入源代码的Web应用服务器，属于轻量级应用服务器，在中小型系统和并发访问用户不是很多的场合下普遍使用，是开发和高度JSP程序的首选。 
+下面我就分步骤向大家介绍如何创建带Nginx服务的Centos Docker镜像。 
+基础镜像：
+
+[root@localhost ~]# docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
+sshd                dockerfile          411d5fb16366        2 days ago          278 MB
+centos              latest              0f73ae75014f        5 weeks ago         172.3 MB
+1
+2
+3
+4
+其中镜像sshd:dockerfile是以镜像centos为基础的开放SSH服务的镜像。 
+第一部分，手工配置并生成镜像 
+一 、以镜像sshd-centos为基础新建容器，并指定容器的ssh端口22映射到宿主机的2222端口上.
+
+docker run -d -p 2222:22 sshd:dockerfile /usr/sbin/sshd -D
+1
+查看容器运行情况：
+
+[root@localhost ~]# docker ps -a
+CONTAINER ID        IMAGE               COMMAND               CREATED             STATUS              PORTS                  NAMES
+bdde7d657620        sshd:dockerfile     "/usr/sbin/sshd -D"   6 seconds ago       Up 5 seconds        0.0.0.0:2222->22/tcp   romantic_bardeen
+1
+2
+3
+二、在宿主机上通过ssh登录容器
+
+ssh localhost -p 2222
+1
+如果提示没有ssh命令请安装openssh-clients
+
+yum install -y openssh-clients
+1
+三、下载源码包及相关软件 
+1、安装wget
+
+cd /usr/local/src
+yum install -y wget
+1
+2
+2、下载源码包 
+下载JDK
+
+wget --no-check-certificate -c --header "Cookie: oraclelicense=accept-securebackup-cookie" http://download.oracle.com/otn-pub/java/jdk/8u60-
+b27/jdk-8u60-linux-x64.tar.gz
+1
+2
+上面的地址要去官网的地址去获取，每超过30分钟就会失效：http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html
+
+下载Tomcat
+
+wget http://apache.fayea.com/tomcat/tomcat-8/v8.0.27/bin/apache-tomcat-8.0.27.tar.gz
+1
+四、安装JDK
+
+1、解压源码包
+
+tar -zxvf jdk-8u60-linux-x64.tar.gz
+mv jdk1.8.0_60 /usr/local/jdk1.8.0_60
+1
+2
+2、配置JDK环境脚本
+
+touch  /etc/profile.d/java.sh
+echo "JAVA_HOME=/usr/local/jdk1.8.0_60" >> /etc/profile.d/java.sh
+echo "JAVA_BIN=/usr/local/jdk1.8.0_60/bin" >> /etc/profile.d/java.sh
+echo "JRE_HOME=/usr/local/jdk1.8.0_60/jre" >> /etc/profile.d/java.sh
+echo "PATH=$PATH:/usr/local/jdk1.8.0_60/bin:/usr/local/jdk1.8.0_60/jre/bin" >> /etc/profile.d/java.sh
+echo "CLASSPATH=/usr/local/jdk1.8.0_60/jre/lib:/usr/local/jdk1.8.0_60/lib:/usr/local/jdk1.8.0_60/jre/lib/charsets.jar" >> /etc/profile.d/java.sh
+1
+2
+3
+4
+5
+6
+3、导入环境脚本
+
+. /etc/profile.d/java.sh
+1
+4、查看是否安装成功
+
+java  -version
+1
+如果安装成功就会显示java版本信息
+
+五、安装tomcat 
+1、解压源码包
+
+tar -zxvf apache-tomcat-8.0.27.tar.gz
+mv apache-tomcat-8.0.27 /usr/local/tomcat
+1
+2
+2、修改配置文件
+
+cd /usr/local/tomcat/bin
+cp catalina.sh catalina.sh.bak
+>catalina.sh
+echo '#!/bin/sh'>>catalina.sh
+echo "JAVA_HOME=/usr/local/jdk1.8.0_60">>catalina.sh
+echo "CATALINA_HOME=/usr/local/tomcat" >> catalina.sh
+grep -v '^#!/bin/sh' catalina.sh.bak >> catalina.sh
+1
+2
+3
+4
+5
+6
+7
+3、启动tomcat服务
+
+ /usr/local/tomcat/bin/catalina.sh start
+1
+查看进程
+
+[root@bdde7d657620 bin]# ps aux
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root         1  0.0  0.3  82456  3436 ?        Ss   07:00   0:00 /usr/sbin/sshd -D
+root        85  0.0  0.4  89792  4520 ?        Ss   07:35   0:00 sshd: root@pts/0
+root        87  0.0  0.1  13264  1976 pts/0    Ss   07:35   0:00 -bash
+root       316 93.3  7.4 2165884 75864 pts/0   Sl   08:31   0:02 /usr/local/jdk1.8.0_60/bin/java -Djava.util
+root       332  0.0  0.1  21284  1268 pts/0    R+   08:31   0:00 ps aux
+1
+2
+3
+4
+5
+6
+7
+六、新建启动脚本
+
+vi /usr/local/sbin/run.sh
+1
+脚本内容：
+
+#!/bin/bash
+/usr/sbin/sshd -D &
+/usr/local/tomcat/bin/catalina.sh run
+1
+2
+3
+七、生成镜像 
+1、退出容器，运行下面的命令查看窗口信息
+
+[root@localhost ~]# docker ps -a
+CONTAINER ID        IMAGE               COMMAND               CREATED             STATUS              PORTS                  NAMES
+bdde7d657620        sshd:dockerfile     "/usr/sbin/sshd -D"   About an hour ago   Up About an hour    0.0.0.0:2222->22/tcp   romantic_bardeen
+1
+2
+3
+2、生成镜像
+
+[root@localhost ~]# docker commit bdde7d657620 tomcat:centos
+d2f8ec74f011e5bcd0b544b251cc120a31e53411f6ab2904c103c5f3a759096d
+1
+2
+3、查看镜像
+
+[root@localhost ~]# docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
+tomcat              centos              d2f8ec74f011        44 seconds ago      862.9 MB
+sshd                dockerfile          411d5fb16366        2 days ago          278 MB
+centos              latest              0f73ae75014f        5 weeks ago         172.3 MB
+1
+2
+3
+4
+5
+4、根据新生成的镜像生成容器
+
+[root@localhost ~]# docker run -d -p 2223:22 -p 8081:8080 tomcat:centos /usr/local/sbin/run.sh
+5fd0af983d91e621b3b450cfdcc5c35d6ef8d8b1819220395ba44b63c28f1277
+1
+2
+分别映射容器的22、8080端口给宿主机的2223、8081端口，并运行启动脚本。 
+查看新生成的容器：
+
+[root@localhost ~]# docker ps -a
+CONTAINER ID        IMAGE               COMMAND                CREATED             STATUS              PORTS                                          NAMES
+5fd0af983d91        tomcat:centos       "/usr/local/sbin/run   9 seconds ago       Up 7 seconds        0.0.0.0:2223->22/tcp, 0.0.0.0:8081->8080/tcp   determined_leakey
+bdde7d657620        sshd:dockerfile     "/usr/sbin/sshd -D"    About an hour ago   Up About an hour    0.0.0.0:2222->22/tcp                           romantic_bardeen
+1
+2
+3
+4
+5、测试
+
+[root@localhost ~]# curl localhost:8081
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Apache Tomcat/8.0.27</title>
+        <link href="favicon.ico" rel="icon" type="image/x-icon" />
+        <link href="favicon.ico" rel="shortcut icon" type="image/x-icon" />
+        <link href="tomcat.css" rel="stylesheet" type="text/css" />
+    </head>
+.........
+省略中间内容
+.........
+                <div class="col20">
+                    <div class="container">
+                        <h4>Apache Software Foundation</h4>
+                        <ul>
+                            <li><a href="http://tomcat.apache.org/whoweare.html">Who We Are</a></li>
+                            <li><a href="http://tomcat.apache.org/heritage.html">Heritage</a></li>
+                            <li><a href="http://www.apache.org">Apache Home</a></li>
+                            <li><a href="http://tomcat.apache.org/resources.html">Resources</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <br class="separator" />
+            </div>
+            <p class="copyright">Copyright &copy;1999-2015 Apache Software Foundation.  All Rights Reserved</p>
+        </div>
+    </body>
+
+</html>
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+测试成功！
+
+第二部分，通过Dockerfile自动生成镜像 
+由于Dockerfile生成镜像的步骤大多类似，这里直接介绍使用的Dockerfile和需要的脚本文件。
+
+1、新建目录及文件
+
+mkdir /root/tomcat_centos
+cd /root/tomcat_centos
+touch Dockerfile run.sh
+1
+2
+3
+下载JDK 
+JDK的下载方法与手工配置相同。然后解压并移动到/root/tomcat_centos目录下
+
+tar -zxvf jdk-8u60-linux-x64.tar.gz
+1
+目录结构如下
+
+tomcat_centos/
+├── Dockerfile
+├── jdk1.8.0_60
+└── run.sh
+1
+2
+3
+4
+2，run.sh脚本内容：
+
+#!/bin/bash
+/usr/sbin/sshd -D &
+/usr/local/tomcat/bin/catalina.sh run
+1
+2
+3
+3、Dockerfile内容
+
+#新生成的镜像是基于sshd-centos镜像
+FROM sshd-centos
+MAINTAINER by cmsteven
+WORKDIR /usr/local/src
+#安装wget
+RUN yum install -y wget
+#下载tomcat源码包
+RUN wget http://apache.fayea.com/tomcat/tomcat-8/v8.0.27/bin/apache-tomcat-8.0.27.tar.gz
+#从宿主机上复制JDK文件夹
+ADD jdk1.8.0_60 /usr/local/jdk1.8.0_60
+#配置JDK环境脚本
+RUN touch  /etc/profile.d/java.sh
+RUN echo "JAVA_HOME=/usr/local/jdk1.8.0_60" >> /etc/profile.d/java.sh
+RUN echo "JAVA_BIN=/usr/local/jdk1.8.0_60/bin" >> /etc/profile.d/java.sh
+RUN echo "JRE_HOME=/usr/local/jdk1.8.0_60/jre" >> /etc/profile.d/java.sh
+RUN echo "PATH=$PATH:/usr/local/jdk1.8.0_60/bin:/usr/local/jdk1.8.0_60/jre/bin" >> /etc/profile.d/java.sh
+RUN echo "CLASSPATH=/usr/local/jdk1.8.0_60/jre/lib:/usr/local/jdk1.8.0_60/lib:/usr/local/jdk1.8.0_60/jre/lib/charsets.jar" >> /etc/profile.d/java.sh
+#导入JDK环境
+RUN . /etc/profile.d/java.sh
+#解压tomcat源码包
+RUN tar -zxvf /usr/local/src/apache-tomcat-8.0.27.tar.gz
+RUN mv /usr/local/src/apache-tomcat-8.0.27 /usr/local/tomcat
+#修改tomcat启动脚本
+WORKDIR /usr/local/tomcat/bin
+RUN cp  /usr/local/tomcat/bin/catalina.sh  /usr/local/tomcat/bin/catalina.sh.bak
+RUN > /usr/local/tomcat/bin/catalina.sh
+RUN echo '#!/bin/sh'>> /usr/local/tomcat/bin/catalina.sh
+RUN echo "JAVA_HOME=/usr/local/jdk1.8.0_60">> /usr/local/tomcat/bin/catalina.sh
+RUN echo "CATALINA_HOME=/usr/local/tomcat" >>  /usr/local/tomcat/bin/catalina.sh
+RUN grep -v '^#!/bin/sh' catalina.sh.bak >>  /usr/local/tomcat/bin/catalina.sh
+#启动tomcat服务
+RUN  /usr/local/tomcat/bin/catalina.sh start
+#复制容器启动脚本
+ADD run.sh /usr/local/sbin/run.sh
+#设置脚本权限
+RUN chmod 755 /usr/local/sbin/run.sh
+CMD ["/usr/local/sbin/run.sh"]
+#开放容器的22和8080端口
+EXPOSE 8080
+EXPOSE 22

@@ -1,0 +1,74 @@
+ Linux SVN服务器做定时全量备份脚本
+ 
+ Linux SVN服务器做定时全量备份脚本：
+
+         进入目录：cd /root/svn/
+
+          新建sh文件：week_backed_up.sh
+
+          文件内容：
+
+              
+
+[plain] view plain copy
+#!/bin/bash  
+  
+#function：SVN全量备份  
+  
+#Author： wangmuming   
+  
+svn_repos="/data/svndata/companyname" #版本库目录  
+  
+backup_dir="/usr/svn/backup" #备份目录  
+  
+next_backup_file="week_incremental_backup".`date +%Y%m%d`  
+  
+log="$backup_dir/week_backed_up.log" #日志文件  
+  
+echo "********************"`date`"***************">> $log  
+  
+echo "SVN ALL DUMP start!">> $log  
+  
+last_rev="`/usr/local/subversion/bin/svnlook youngest $svn_repos`" #最新版本  
+  
+if [ -f $next_backup_file ];then  
+  
+   echo "No new revisions to backup."  
+   exit 0  
+else  
+  
+/usr/local/subversion/bin/svnadmin dump --incremental --revision 0:$last_rev $svn_repos > $backup_dir/$next_backup_file #0版本，到最新版本的全量备份  
+  
+fi  
+  
+echo "Last:$last_rev">> $log #记录版本库最新版本  
+  
+#删除30天之前的备份数据  
+  
+find $backup_dir -type f -mtime +30  -exec rm -rf {} \; | tee -a $log   
+  
+echo "********************"`date`"***************">>$log  
+
+ 新建定时任务：crontab -e
+
+     10 2 * * 0 /bin/sh /root/svn/week_backed_up.sh
+
+
+ 启动定时任务：service crond start
+
+
+ 此脚本可以手动调用；
+
+
+ /usr/svn/backup 目录：
+
+ 
+
+[plain] view plain copy
+-rw-r--r-- 1 root root       2198 Jul  7 09:38 week_backed_up.log  
+-rw-r--r-- 1 root root 4471965478 Jul  7 09:36 week_incremental_backup.20150707  
+
+至此，svn定时全量备份完成。
+
+
+

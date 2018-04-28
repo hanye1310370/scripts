@@ -1,0 +1,26 @@
+安装php连接redis cluster扩展
+ 1、下载群集扩展
+
+wget https://github.com/nrk/predis/archive/v1.0.zip
+unzip v1.0
+cp -Rf predis-1.0 /u01/html/predis
+注：/u01/html为系统目录
+
+2、连接redis集群
+
+<?php
+//连接本地的 Redis 服务
+require 'predis/autoload.php';
+$parameters = ['tcp://192.168.1.231:7003', 'tcp://192.168.1.231:7003', 'tcp://192.168.1.231:7005'];
+$options    = ['cluster' => 'redis'];
+$redis = new Predis\Client($parameters, $options);
+$x=rand(10,100);
+//设置 redis 字符串数据
+$redis->set("y".$x, "tank".$x*2); 
+// 获取存储的数据并输出
+$result = $redis->get("y".$x);  
+//输出结果
+echo $result;
+?>
+
+注：Predis只是几个PHP文件，不需要安装到PHP扩展中，只需要把文件拷到php能调用的目录就行

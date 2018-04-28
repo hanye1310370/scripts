@@ -1,0 +1,57 @@
+批量分发脚本内容
+[root@m01 scripts]# vim ssh-key.sh 
+#!/bin/bash
+. /etc/rc.d/init.d/functions
+
+# 创建密钥
+\rm ~/.ssh/id_rsa* -f
+ssh-keygen -t rsa -f ~/.ssh/id_rsa -N "" -q
+# 分发公钥
+for ip in 31 41 8
+do
+sshpass -p123456 ssh-copy-id -i ~/.ssh/id_rsa.pub " root@172.16.1.$ip  -o StrictHostKeyChecking=no " &>/dev/null
+if [ $? -eq 0 ];then
+action  "fenfa 172.16.1.$ip"  /bin/true
+else
+action  "fenfa 172.16.1.$ip"  /bin/false
+fi
+echo ""
+done
+脚本执行效果：
+
+[root@m01 scripts]# sh ssh-key.sh
+fenfa 172.16.1.31                                          [  OK  ]
+fenfa 172.16.1.41                                          [  OK  ]
+fenfa 172.16.1.8                                           [  OK  ]
+
+实现基于密钥的批量管理脚本
+[root@m01 scripts]# vim piliang_guanli.sh 
+#!/bin/bash
+CMD=$1
+
+for ip in 8 31 41
+do
+echo ========host 172.16.1.$ip=======
+ssh root@172.16.1.$ip "$CMD"
+echo ============END===============
+echo ""
+done
+脚本执行效果：
+
+[root@m01 scripts]# sh piliang_guanli.sh  date
+======172.16.1.8======
+Thu Oct 19 16:25:08 CST 2017
+=========END=============
+
+
+======172.16.1.31======
+Thu Oct 19 16:25:08 CST 2017
+=========END=============
+
+ 
+======172.16.1.41======
+Thu Oct 19 16:25:08 CST 2017
+=========END=============
+基于密钥登陆方式，分发的公钥文件会识别用户信息，所以能够实现免密码批量管理。
+
+

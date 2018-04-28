@@ -1,0 +1,71 @@
+[Unit]
+Description=Etcd Server
+After=network.target
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+WorkingDirectory=/var/lib/etcd/
+EnvironmentFile=/etc/etcd/etcd.conf
+ExecStart=/bin/bash -c "GOMAXPROCS=$(nproc) /usr/bin/etcd --name=\"${ETCD_NAME}\" --data-dir=\"${ETCD_DATA_DIR}\" --listen-client-urls=\"${ETCD_LISTEN_CLIENT_URLS}\" --listen-peer-urls=\"${ETCD_LISTEN_PEER_URLS}\" --advertise-client-urls=\"${ETCD_ADVERTISE_CLIENT_URLS}\" --initial-advertise-peer-urls=\"${ETCD_INITIAL_ADVERTISE_PEER_URLS}\" --initial-cluster=\"${ETCD_INITIAL_CLUSTER}\" --initial-cluster-state=\"${ETCD_INITIAL_CLUSTER_STATE}\""
+Restart=on-failure
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+
+Etcd的参数配置方式有两种，一种是命令行的方式，一种是环境变量的方式。命令行方式的优先级高于环境变量的方式。
+
+Etcd默认2379端口处理客户端的请求；2380端口用于集群各成员间的通信。
+
+#[member]
+
+-name 或 ETCD_NAME:
+
+指定当前etcd成员的名称 默认值为"default",通常用户Hostname来命名。
+
+-data-dir或ETCD_DATA_DIR：
+
+etcd数据文件目录，默认是“${name}.etcd”
+
+–snapshot-count或ETCD_SNAPSHOT_COUNT：
+
+指定多少次commit操作会触发一次磁盘快照，默认值是10000
+
+–heartbeat-interval或 ETCD_ELECTION_TIMEOUT：
+
+心跳信号间隔，毫秒级，默认是100毫秒。
+
+–listen-peer-urls或 ETCD_LISTEN_PEER_URLS
+
+用于监听集群中其他成员的发送信息的地址。默认值是“http://localhost:2380”
+
+–listen-client-urls或ETCD_LISTEN_CLIENT_URLS：
+用于监听客户端发来的信息的地址，默认值是“http://localhost:2379”
+
+–max-snapshots或ETCD_MAX_SNAPSHOTS
+镜像文件的最大个数，默认是5.0表示无限制
+
+–max-wals或ETCD_MAX_WALS：
+
+#[cluster]
+–initial-advertise-peer-urls或 ETCD_INITIAL_ADVERTISE_PEER_URLS：
+集群中各节点相互通信的地址。
+
+–initial-cluster或ETCD_INITIAL_CLUSTER：
+初始集群由哪些成员组成 默认值是“efault=http://localhost:2380”
+
+–initial-cluster-state或ETCD_INITIAL_CLUSTER_STATE：
+集群的初始状态，其值有“new”和“existing”,默认为“new”
+
+–initial-cluster-token:ETCD_INITIAL_CLUSTER_TOKEN:
+
+集群名称
+
+–advertise-client-urls或ETCD_ADVERTISE_CLIENT_URLS：
+
+客户端与集群通信地址

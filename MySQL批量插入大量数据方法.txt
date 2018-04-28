@@ -1,0 +1,132 @@
+在MySQL数据库中，如果要插入上百万级的记录，用普通的insert into来操作非常不现实，速度慢人力成本高，推荐使用Load Data或存储过程来导入数据，我总结了一些方法分享如下，主要基于MyISAM和InnoDB引擎。
+
+1 InnoDB存储引擎
+首先创建数据表（可选），如果有了略过：
+
+> CREATE DATABASE ecommerce;
+> USE ecommerce;
+> CREATE TABLE employees (
+  id INT NOT NULL,
+  fname VARCHAR(30),
+  lname VARCHAR(30),
+  birth TIMESTAMP,
+  hired DATE NOT NULL DEFAULT '1970-01-01',
+  separated DATE NOT NULL DEFAULT '9999-12-31',
+  job_code INT NOT NULL,
+  store_id INT NOT NULL
+  )
+  partition BY RANGE (store_id) (
+  partition p0 VALUES LESS THAN (10000),
+  partition p1 VALUES LESS THAN (50000),
+  partition p2 VALUES LESS THAN (100000),
+  partition p3 VALUES LESS THAN (150000),
+  Partition p4 VALUES LESS THAN MAXVALUE
+  );
+然后创建存储过程，其中，delimiter命令用来把语句定界符从;变为//，不然到declare var int;遇上第一个分号MySQL就错误停止：
+
+> use ecommerce;
+> DROP PROCEDURE BatchInser IF EXISTS;
+> delimiter //   -- 把界定符改成双斜杠
+> CREATE PROCEDURE BatchInsert(IN init INT, IN loop_time INT)  -- 第一个参数为初始ID号（可自定义），第二个位生成MySQL记录个数
+  BEGIN
+      DECLARE Var INT;
+      DECLARE ID INT;
+      SET Var = 0;
+      SET ID = init;
+      WHILE Var < loop_time DO
+          insert into employees(id, fname, lname, birth, hired, separated, job_code, store_id) values (ID, CONCAT('chen', ID), CONCAT('haixiang', ID), Now(), Now(), Now(), 1, ID);
+          SET ID = ID + 1;
+          SET Var = Var + 1;
+      END WHILE;
+  END;
+  //
+> delimiter ;  -- 界定符改回分号
+> CALL BatchInsert(30036, 200000);   -- 调用存储过程插入函数
+也可以把上面的内容（除了语句之前的>号）复制到MySQL查询框中执行。
+
+ 
+
+2 MyISAM存储引擎
+首先创建数据表（可选）：
+
+> use ecommerce;
+> CREATE TABLE ecommerce.customer (
+ id INT NOT NULL,
+ email VARCHAR(64) NOT NULL,
+ name VARCHAR(32) NOT NULL,
+ password VARCHAR(32) NOT NULL,
+ phone VARCHAR(13),
+ birth DATE,
+ sex INT(1),
+ avatar BLOB,
+ address VARCHAR(64),
+ regtime DATETIME,
+ lastip VARCHAR(15),
+ modifytime TIMESTAMP NOT NULL,
+ PRIMARY KEY (id)
+ ) ENGINE = MyISAM ROW_FORMAT = DEFAULT
+ partition BY RANGE (id) (
+ partition p0 VALUES LESS THAN (100000),
+ partition p1 VALUES LESS THAN (500000),
+ partition p2 VALUES LESS THAN (1000000),
+ partition p3 VALUES LESS THAN (1500000),
+ partition p4 VALUES LESS THAN (2000000),
+ Partition p5 VALUES LESS THAN MAXVALUE
+ );
+再创建存储过程：
+
+> use ecommerce;
+> DROP PROCEDURE ecommerce.BatchInsertCustomer IF EXISTS;
+> delimiter //
+> CREATE PROCEDURE BatchInsertCustomer(IN start INT,IN loop_time INT)
+  BEGIN
+      DECLARE Var INT;
+      DECLARE ID INT;
+      SET Var = 0;
+      SET ID= start;
+      WHILE Var < loop_time DO
+          insert into customer(ID, email, name, password, phone, birth, sex, avatar, address, regtime, lastip, modifytime) 
+          values (ID, CONCAT(ID, '@sina.com'), CONCAT('name_', rand(ID)*10000 mod 200), 123456, 13800000000, adddate('1995-01-01', (rand(ID)*36520) mod 3652), Var%2, 'http:///it/u=2267714161, 58787848&fm=52&gp=0.jpg', '北京市海淀区', adddate('1995-01-01', (rand(ID)*36520) mod 3652), '8.8.8.8', adddate('1995-01-01', (rand(ID)*36520) mod 3652));
+          SET Var = Var + 1;
+          SET ID= ID + 1;
+      END WHILE;
+  END;
+  //
+> delimiter ;
+调用存储过程插入数据
+
+> ALTER TABLE customer DISABLE KEYS;
+> CALL BatchInsertCustomer(1, 2000000);
+> ALTER TABLE customer ENABLE KEYS;
+通过以上对比发现对于插入大量数据时可以使用MyISAM存储引擎，如果再需要修改MySQL存储引擎可以使用命令：
+
+ ALTER TABLE ecommerce ENGINE = MYISAM;
+3 关于批量插入
+很久很久以前，为了写某个程序，必须在MySQL数据库中插入大量的数据，一共有85766121条。近一亿条的数据，怎么才能快速插入到MySQL里呢？
+
+当时的做法是用INSERT INTO一条一条地插入，Navicat 估算需要十几个小时的时间才能完成，就放弃了。最近几天学习了一下MySQL，提高数据插入效率的基本原则如下：
+
+批量插入数据的效率比单数据行插入的效率高
+插入无索引的数据表比插入有索引的数据表快一些
+较短的SQL语句的数据插入比较长的语句快
+这些因素有些看上去是微不足道的，但是如果插入大量的数据，即使很小的影响效率的因素也会形成不同的结果。根据上面讨论的规则，我们可以就如何快速地加载数据得出几个实用的结论。
+
+使用LOAD DATA语句要比INSERT语句效率高，因为它批量插入数据行。服务器只需要对一个语句（而不是多个语句）进行语法分析和解释。索引只有在所有数据行处理完之后才需要刷新，而不是每处理一行都刷新。
+如果你只能使用INSERT语句，那就要使用将多个数据行在一个语句中给出的格式：INSERT INTO table_name VALUES(...),(...),...，这将会减少你需要的语句总数，最大程度地减少了索引刷新的次数。
+根据上面的结论，今天又对相同的数据和数据表进行了测试，发现用LOAD DATA速度快了不只是一点点，竟然只用了十多分钟！所以在MySQL需要快速插入大量数据时，LOAD DATA是你不二的选择。
+
+顺便说一下，在默认情况下，LOAD DATA语句将假设各数据列的值以制表符（t）分隔，各数据行以换行符（n）分隔，数据值的排列顺序与各数据列在数据表里的先后顺序一致。但你完全可以用它来读取其他格式的数据文件或者按其他顺序来读取各数据列的值，有关细节请参照MySQL文档。
+
+4 总结
+1. 对于Myisam类型的表，可以通过以下方式快速的导入大量的数据。
+
+ALTER TABLE tblname DISABLE KEYS;
+loading the data
+ALTER TABLE tblname ENABLE KEYS;
+这两个命令用来打开或者关闭MyISAM表非唯一索引的更新。在导入大量的数据到一个非空的MyISAM表时，通过设置这两个命令，可以提高导入的效率。对于导入大量 数据到一个空的MyISAM表，默认就是先导入数据然后才创建索引的，所以不用进行 设置。
+
+2. 而对于Innodb类型的表，这种方式并不能提高导入数据的效率。对于Innodb类型的表，我们有以下几种方式可以提高导入的效率：
+
+因为Innodb类型的表是按照主键的顺序保存的，所以将导入的数据按照主键的顺序排列，可以有效的提高导入数据的效率。如果Innodb表没有主键，那么系统会默认创建一个内部列作为主键，所以如果可以给表创建一个主键，将可以利用这个优势提高 导入数据的效率。
+在导入数据前执行SET  UNIQUE_CHECKS=0，关闭唯一性校验，在导入结束后执行SET  UNIQUE_CHECKS=1，恢复唯一性校验，可以提高导入的效率。
+如果应用使用自动提交的方式，建议在导入前执行SET  AUTOCOMMIT=0，关闭自动提交，导入结束后再执行

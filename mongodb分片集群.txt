@@ -1,0 +1,108 @@
+config={ _id:"repset", members:[ {_id:0,host:'192.168.1.204:27017'},{_id:1,host:'192.168.1.190:27017'},{_id:2,host:'192.168.1.199:27017'}] };
+rs.initiate(config)  
+rs.status()
+
+use test;
+db.testdb.insert({"test1":"testval1"})
+db.testdb.find();
+show tables;
+db.getMongo().setSlaveOk();
+
+
+
+
+
+
+kill -3 `ps -ef|grep mongod|grep -v grep|awk '{print $2}'`
+                                  主机1（172.19.0.215）         主机2（172.19.0.216）                                  主机3（172.19.0.217）
+     第一片(11731)                  主                                   副本                                              仲裁
+ 
+     第二片(11732)                  仲裁                                  主                                                副本
+ 
+     第三片(11733)                 副本                                   仲裁                                               主
+
+
+public class TestMongoDBReplSet
+
+mkdir -p /data/shard{1..3}_1
+mkdir -p /data/shard{1..3}_2
+mkdir -p /data/shard{1..3}_3
+mkdir -p /data/config
+mongodb/bin/mongod --shardsvr --replSet shard1 --port 27017 --dbpath /data/shard1_1 --logpath /data/shard1_1/shard1_1.log --logappend --fork
+
+config={ _id:"shard1", members:[ {_id:0,host:'192.168.1.204:27017',priority:10}, {_id:1,host:'192.168.1.193:27017',priority:1}, {_id:2,host:'192.168.1.199:27017',arbiterOnly:true}] }
+
+config={ _id:"shard2", members:[ {_id:0,host:'192.168.1.204:27018',priority:1}, {_id:1,host:'192.168.1.193:27018',priority:10}, {_id:2,host:'192.168.1.199:27018',arbiterOnly:true}] }
+
+config={ _id:"shard3", members:[ {_id:0,host:'192.168.1.204:27019,arbiterOnly:true'}, {_id:1,host:'192.168.1.193:27019,arbiterOnly:true'}, {_id:2,host:'192.168.1.199:27019',priority:1}] }
+
+
+mongodb/bin/mongod --shardsvr --replSet shard3 --port 27019 --dbpath /data/shard3_1 --logpath /data/shard3_1/shard3_1.log --logappend --fork
+mongodb/bin/mongod --shardsvr --replSet shard3 --port 27019 --dbpath /data/shard3_2 --logpath /data/shard3_2/shard3_2.log --logappend --fork
+mongodb/bin/mongod --shardsvr --replSet shard3 --port 27019 --dbpath /data/shard3_3 --logpath /data/shard3_3/shard3_3.log --logappend --fork
+
+mongodb/bin/mongos --configdb 192.168.1.204:20000,192.168.1.193:20000,192.168.1.199:20000 --port 30000 --chunkSize 1 --logpath /data/mongos.log --logappend --fork
+
+
+db.runCommand({addshard:'shard1/192.168.1.204:27017,192.168.1.193:27017,192.168.1.199:27017'})
+db.runCommand({addshard:'shard2/192.168.1.204:27018,192.168.1.193:27018,192.168.1.199:27018'})
+db.runCommand({addshard:'shard3/192.168.1.204:27019,192.168.1.193:27019,192.168.1.199:27019'})
+db.runCommand({listshards : 1})
+
+db.runCommand({enablesharding:'dbname'})
+db.runCommand({enablesharding:"testdb"})
+db.runCommand({shardcollection:'testdb.table1',key:{id:1}})
+for(var i=1;i<20000;i++)db.table1.insert({id:i,"test1":"testval1"});
+
+mongos> for(var i=1;i<20000;i++) { db.table1.insert({id:i,"test1":"testval1"}); }
+
+mongos> db.table1.getShardDistribution()
+
+Shard shard2 at shard2/192.168.1.193:27018,192.168.1.204:27018
+ data : 1.06MiB docs : 19999 chunks : 1
+ estimated data per chunk : 1.06MiB
+ estimated docs per chunk : 19999
+
+Totals
+ data : 1.06MiB docs : 19999 chunks : 1
+ Shard shard2 contains 100% data, 100% docs in cluster, avg obj size on shard : 56B
+
+mongos> db.table1.stats()
+{
+	"sharded" : true,
+	"ns" : "testdbs.table1",
+	"count" : 19999,
+	"numExtents" : 5,
+	"size" : 1119944,
+	"storageSize" : 2793472,
+	"totalIndexSize" : 1218224,
+	"indexSizes" : {
+		"_id_" : 654080,
+		"id_1" : 564144
+	},
+	"avgObjSize" : 56,
+	"nindexes" : 2,
+	"nchunks" : 1,
+	"shards" : {
+		"shard2" : {
+			"ns" : "testdbs.table1",
+			"count" : 19999,
+			"size" : 1119944,
+			"avgObjSize" : 56,
+			"storageSize" : 2793472,
+			"numExtents" : 5,
+			"nindexes" : 2,
+			"lastExtentSize" : 2097152,
+			"paddingFactor" : 1,
+			"systemFlags" : 1,
+			"userFlags" : 0,
+			"totalIndexSize" : 1218224,
+			"indexSizes" : {
+				"_id_" : 654080,
+				"id_1" : 564144
+			},
+			"ok" : 1
+		}
+	},
+	"ok" : 1
+}

@@ -1,0 +1,77 @@
+docker资源限制
+DOCKER 1.8.2
+
+CPU的资源限制：
+
+-c CPU权重
+只有争用时权重才有意义
+例如，启动两个容器，使用同一个cpu权重分别为1024和512
+
+docker run -ti --rm -c 1024 --cpuset-cpus=0 centos
+docker run -ti --rm -c 512 --cpuset-cpus=0 centos
+分别执行：while true;do i=1;done 消耗CPU资源
+
+复制代码
+[root@centos-1 ~]# top
+top - 00:21:43 up 51 min,  3 users,  load average: 1.14, 0.67, 0.55
+Tasks: 203 total,   4 running, 199 sleeping,   0 stopped,   0 zombie
+%Cpu0  :100.0 us,  0.0 sy,  0.0 ni,  0.0 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+%Cpu1  :  0.0 us,  0.3 sy,  0.0 ni, 99.7 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+%Cpu2  :  0.0 us,  0.3 sy,  0.0 ni, 99.7 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+%Cpu3  :  0.0 us,  0.0 sy,  0.0 ni,100.0 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+KiB Mem :  1013272 total,   661444 free,   133464 used,   218364 buff/cache
+KiB Swap:  2097148 total,  2097148 free,        0 used.   719192 avail Mem 
+
+  PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND                                                                                            
+ 3517 root      20   0   11772   1748   1404 R  66.8  0.2   0:22.34 bash                                                                                               
+ 3584 root      20   0   11772   1748   1404 R  33.2  0.2   0:30.42 bash     
+复制代码
+结果如同权重设置一致：最大CPU消耗为1024:512=2:1
+
+--cpuset-cpus=        CPUs in which to allow execution (0-3, 0,1)
+
+#创建如下容器，仅使用0，1CPU资源：
+
+docker run -ti --rm --cpuset-cpus=0,1 centos
+耗尽资源：
+
+复制代码
+[root@d7cf41bd1340 /]# ps -ef | grep test    
+root        16     1 96 16:29 ?        00:01:18 sh test.sh
+root        17     1 54 16:29 ?        00:00:32 sh test.sh
+root        18     1 48 16:29 ?        00:00:24 sh test.sh
+root        23     1 34 16:30 ?        00:00:01 sh test.sh
+root        24     1 32 16:30 ?        00:00:01 sh test.sh
+root        25     1 37 16:30 ?        00:00:01 sh test.sh
+复制代码
+复制代码
+top - 00:31:47 up  1:01,  3 users,  load average: 4.97, 2.73, 1.55
+Tasks: 208 total,   7 running, 201 sleeping,   0 stopped,   0 zombie
+%Cpu0  :100.0 us,  0.0 sy,  0.0 ni,  0.0 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+%Cpu1  :100.0 us,  0.0 sy,  0.0 ni,  0.0 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+%Cpu2  :  0.0 us,  0.0 sy,  0.0 ni,100.0 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+%Cpu3  :  0.0 us,  0.3 sy,  0.0 ni, 99.7 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+KiB Mem :  1013272 total,   651904 free,   138928 used,   222440 buff/cache
+KiB Swap:  2097148 total,  2097148 free,        0 used.   713716 avail Mem 
+
+  PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND                                                                                            
+ 3696 root      20   0   11632   1124    940 R  33.6  0.1   0:55.70 sh                                                                                                 
+ 3697 root      20   0   11632   1120    940 R  33.6  0.1   0:48.37 sh                                                                                                 
+ 3703 root      20   0   11632   1124    940 R  33.6  0.1   0:25.18 sh                                                                                                 
+ 3694 root      20   0   11632   1120    940 R  33.2  0.1   1:41.80 sh                                                                                                 
+ 3704 root      20   0   11632   1120    940 R  33.2  0.1   0:24.74 sh                                                                                                 
+ 3705 root      20   0   11632   1124    940 R  33.2  0.1   0:24.55 sh         
+复制代码
+ 
+
+限制内存：
+-m 内存限制
+--memory-swap=                  Total memory (memory + swap), '-1' to disable swap 限制swap
+
+#内存128m，swap 128m
+
+docker run -ti --rm -m 128m --memory-swap=256m centos
+
+由于懒，没测试
+
+ 

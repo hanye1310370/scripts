@@ -1,0 +1,32 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+from fabric.api import *
+from fabric.context_managers import *
+from fabric.contrib.console import confirm
+env.hosts=['192.168.1.23','192.168.1.24']
+#假如所有主机密码都不一样，可以通过env.passwords字典变量一一指定
+env.passwords = {
+  'root@192.168.1.23:22': '123456',
+  'root@192.168.1.24:22': '123456',
+}
+  
+lpackpath="/home/a.tar.gz"
+rpackpath="/tmp/install"
+  
+@task
+def put_task():
+  run("mkdir -p /tmp/install")
+  with settings(warn_only=True):
+    result = put(lpackpath, rpackpath)
+  if result.failed and not confirm("put file failed, Continue[Y/N]?"):
+    abort("Aborting file put task!")
+  
+@task
+def run_task():
+  with cd("/tmp/install"):
+    run("tar -zxvf a.tar.gz")
+  
+@task
+def go():
+  put_task()
+  run_task()

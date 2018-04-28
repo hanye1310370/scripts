@@ -1,0 +1,60 @@
+Xshell 5 注册码： 101210-450789-147200
+Xftp 5 注册码：101210-450789-147200
+Xmanager 5 注册码：101210-450789-147200
+Xshell4.0注册码
+690313-111999-999313
+xftp4.0注册码
+101210-450789-147200
+
+
+
+运算GO环境测试
+
+创建测试文件 hello_world.go
+[root@localhost ~]# vim ~/dev/go/hello_world.go
+1
+编辑文件
+package main
+
+import (
+    "fmt"
+)
+
+func main() {
+    fmt.Println( "Hello world!" )
+}
+
+运算测试文件 hello_world.go
+[root@localhost ~]# go run ~/dev/go/hello_world.go 
+Hello world!
+
+redis-benchmark  -h 192.168.1.211 -p 6379 -c 100 -n 100000  -a 56789
+100个并发连接，100000个请求，检测host为localhost 端口为6379的redis服务器性能 
+====== MSET (10 keys) ======
+  100000 requests completed in 2.72 seconds
+  100 parallel clients
+  3 bytes payload
+  keep alive: 1
+
+
+36751.20 requests per second
+
+测试存取大小为100字节的数据包的性能
+root@debian43:~# redis-benchmark  -h 192.168.1.211 -p 6379 -q -d 100   -a 56789               
+PING_INLINE: 60168.47 requests per second
+PING_BULK: 67704.80 requests per second
+SET: 66711.14 requests per second
+GET: 68352.70 requests per second
+INCR: 58651.02 requests per second
+LPUSH: 57405.28 requests per second
+RPUSH: 66357.00 requests per second
+LPOP: 67024.13 requests per second
+RPOP: 63051.70 requests per second
+SADD: 69979.01 requests per second
+SPOP: 67521.95 requests per second
+LPUSH (needed to benchmark LRANGE): 59952.04 requests per second
+LRANGE_100 (first 100 elements): 27586.21 requests per second
+LRANGE_300 (first 300 elements): 10176.05 requests per second
+LRANGE_500 (first 450 elements): 6922.33 requests per second
+LRANGE_600 (first 600 elements): 5563.90 requests per second
+MSET (10 keys): 29086.68 requests per second

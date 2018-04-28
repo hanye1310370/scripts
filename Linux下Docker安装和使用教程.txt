@@ -1,0 +1,294 @@
+Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻量级的、可移植的、自给自足的容器。
+开发者在笔记本上编译测试通过的容器可以批量地在生产环境中部署，包括VMs(虚拟机)、bare metal、OpenStack集群和其他的基础应用平台。
+Docker的源代码全部是用Go语言写的。
+一、基础环境
+1、角色、ip、版本、内核
+serverA 10.1.10.236 3.16.0-4-amd64 8.1 docket
+docket 1.6.2
+二、安装docter
+1、添加源
+echo "deb http://http.debian.net/debian jessie-backports main" >> /etc/apt/sources.list
+2、更新源
+apt-get update
+3、安装docker.io包
+
+apt-get install docker.io
+Reading package lists... Done
+Building dependency tree 
+Reading state information... Done
+The following extra packages will be installed:
+aufs-tools cgroupfs-mount git git-man libapparmor1 liberror-perl libnih-dbus1 libnih1 makedev mountall plymouth
+Suggested packages:
+btrfs-tools debootstrap lxc rinse git-daemon-run git-daemon-sysvinit git-doc git-el git-email git-gui gitk gitweb git-arch git-cvs git-mediawiki git-svn desktop-base
+plymouth-themes
+The following NEW packages will be installed:
+aufs-tools cgroupfs-mount docker.io git git-man libapparmor1 liberror-perl libnih-dbus1 libnih1 makedev mountall plymouth
+0 upgraded, 12 newly installed, 0 to remove and 54 not upgraded.
+Need to get 9,986 kB of archives.
+After this operation, 47.2 MB of additional disk space will be used.
+Do you want to continue? [Y/n]
+4、查看版本
+
+docker --version
+Docker version 1.6.2, build 7c8fca2
+5、启动服务
+
+/etc/init.d/docker start
+[ ok ] Starting docker (via systemctl): docker.service.
+6、拉取debian和CentOS镜像
+1)拉取debian镜像
+
+docker pull debian
+latest: Pulling from debian
+843e2bded498: Pull complete 
+8c00acfb0175: Pull complete 
+debian:latest: The image you are pulling has been verified. Important: image verification is a tech preview feature and should not be relied on to provide security.
+Digest: sha256:d9168a2c1889b4c9d44952a23065c29b0656237909d618328275f42065602354
+Status: Downloaded newer image for debian:latest
+2)拉取centos镜像
+
+docker pull centos
+Pulling repository centos
+0f73ae75014f: Download complete 
+47d44cb6f252: Download complete 
+f6f39725d938: Download complete 
+f9a8cbc8dd13: Download complete 
+f37e6a610a37: Download complete 
+Status: Downloaded newer image for centos:latest
+7、查看镜像
+
+docker images
+REPOSITORY TAG IMAGE ID CREATED VIRTUAL SIZE
+debian latest 8c00acfb0175 3 weeks ago 125.2 MB
+centos latest 0f73ae75014f 3 weeks ago 172.3 MB
+8、运行名为debian镜像的容器(虚拟
+
+docker images
+REPOSITORY TAG IMAGE ID CREATED VIRTUAL SIZE
+debian latest 8c00acfb0175 3 weeks ago 125.2 MB
+centos latest 0f73ae75014f 3 weeks ago 172.3 MB
+出1个debian系统)
+1)运行debian镜像的容器
+
+docker run -i -t debian
+2)查看版本
+
+root@10.1.10.236:~# docker run debian cat /etc/debian_version
+8.2
+3)查看IP(是dhcp获得 每次获得都不一样)
+
+root@10.1.10.236:~# docker run debian ip 
+a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default 
+link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+inet 127.0.0.1/8 scope host lo
+valid_lft forever preferred_lft forever
+inet6 ::1/128 scope host 
+valid_lft forever preferred_lft forever
+24: eth0: <NO-CARRIER,BROADCAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state DOWN group default 
+link/ether 02:42:ac:11:00:0b brd ff:ff:ff:ff:ff:ff
+inet 172.17.0.11/16 scope global eth0
+valid_lft forever preferred_lft forever
+inet6 fe80::42:acff:fe11:b/64 scope link tentative 
+valid_lft forever preferred_lft forever
+4)查看内核
+
+root@10.1.10.236:~# docker run debian uname -r
+3.16.0-4-amd64
+5)查看硬盘分区情况
+
+root@10.1.10.236:~# docker run -i -t debian df -Th
+Filesystem Type Size Used Avail Use% Mounted on
+none aufs 9.1G 1.6G 7.1G 18% /
+tmpfs tmpfs 115M 0 115M 0% /dev
+shm tmpfs 64M 0 64M 0% /dev/shm
+/dev/sda1 ext4 9.1G 1.6G 7.1G 18% /etc/hosts
+9、运行名为centos镜像的容器(虚拟出1个centos系统)
+1)运行centos镜像的容器
+?
+1
+docker run -i -t centos
+2)查看版本
+?
+1
+2
+root@10.1.10.236:~# docker run centos cat /etc/RedHat-release
+CentOS Linux release 7.1.1503 (Core)
+3)查看内核
+?
+1
+2
+root@10.1.10.236:~# docker run centos uname -r
+3.16.0-4-amd64
+4)查看ip
+
+root@10.1.10.236:~# docker run centos ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN 
+link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+inet 127.0.0.1/8 scope host lo
+valid_lft forever preferred_lft forever
+inet6 ::1/128 scope host 
+valid_lft forever preferred_lft forever
+46: eth0: <NO-CARRIER,BROADCAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state DOWN 
+link/ether 02:42:ac:11:00:16 brd ff:ff:ff:ff:ff:ff
+inet 172.17.0.22/16 scope global eth0
+valid_lft forever preferred_lft forever
+inet6 fe80::42:acff:fe11:16/64 scope link tentative 
+valid_lft forever preferred_lft forever
+5)查看硬盘分区情况
+
+root@10.1.10.236:~# docker run centos df -Th
+Filesystem Type Size Used Avail Use% Mounted on
+rootfs rootfs 9.1G 1.6G 7.1G 18% /
+none aufs 9.1G 1.6G 7.1G 18% /
+tmpfs tmpfs 115M 0 115M 0% /dev
+shm tmpfs 64M 0 64M 0% /dev/shm
+/dev/sda1 ext4 9.1G 1.6G 7.1G 18% /etc/hosts
+tmpfs tmpfs 115M 0 115M 0% /proc/kcore
+tmpfs tmpfs 115M 0 115M 0% /proc/timer_stats
+
+
+搜索某个镜像：
+
+docker  search  busybox
+
+拉取：
+
+docker  pull  busybox
+
+查看：
+
+docker  images
+
+启动并运行：
+
+docker run -it busybox:latest /bin/sh
+docker 的常用命令：
+
+ 　　环境信息相关：
+
+　　　　docker info
+
+　　　　docker version
+
+ 　　系统维护相关：
+
+　　　　images
+
+　　　　inspect
+
+　　　　build
+
+　　　　commit
+
+　　　　pause/unpause
+
+　　　　ps
+
+　　　　rm
+
+　　　　rmi
+
+　　　　run
+
+　　　　start/stop/restart
+
+　　　　top
+
+　　　　kill
+
+　　　　...
+
+　　日志信息相关：
+
+　　　　events
+
+　　　　history
+
+　　　　logs
+
+　　Docker hub服务相关：
+
+　　　　login
+
+　　　　logout
+
+　　　　pull
+
+　　　　push
+
+　　　　search
+
+　　基本操作：
+
+　　　　获取映像：pull
+
+　　　　启动容器：run
+
+　　　　　　-i ，-t 交互式
+
+结束一个正在运行的docker容器
+
+[root@localhost ~]# docker ps
+CONTAINER ID        IMAGE              COMMAND            CREATED            STATUS              PORTS              NAMES
+70f37e4e3742        busybox:latest      "/bin/sh"          50 minutes ago      Up 50 minutes                          prickly_borg
+[root@localhost ~]# docker kill 70f37e4e3742
+70f37e4e3742
+[root@localhost ~]# docker ps
+CONTAINER ID        IMAGE              COMMAND            CREATED            STATUS              PORTS              NAMES
+[root@localhost ~]# docker ps -a
+CONTAINER ID        IMAGE              COMMAND            CREATED            STATUS                      PORTS              NAMES
+70f37e4e3742        busybox:latest      "/bin/sh"          50 minutes ago      Exited (137) 9 seconds ago                      prickly_borg
+
+dockerfile
+
+
+docker run -h="activemq" --name activemq -d -p 51000:22 -p 51001:3306 -p 51003:6379 -p 51002:6381 debian /etc/rc.local
+docker stop activemq
+docker start activemq
+docker run -I -t debian /bin/bash
+
+
+docker ps 
+docker kill 容器ID
+docker stop 容器ID
+
+把容器提交生成最新的镜像
+docker commit 容器ID debian02
+
+打包镜像：
+docker save debian02 > /root/debian02.tar
+在另外的机器导入镜像
+docker load < debian02.tar
+查看存在的镜像：
+docker images   
+启动镜像：
+docker run -h="activemq" --name activemq -d -p 51000:22 -p 51001:3306 -p 51003:6379 -p 51002:6381 debian /etc/rc.local
+docker top  显示容器内运行的进程
+docker images 查看所有的镜像
+docker ps  查看正在运行的容器
+docker ps -l 查看最后退出的容器ID
+docker ps -a  查看所有的容器，包括退出的
+docke logs 容器ID|容器名称   查询某个容器的所有操作纪录
+docke logs -f 容器ID|容器名称   实时查询容器的操作纪录
+
+docker rm $(docker ps -a -q)  删除所有容器
+docker rm  容器名or ID          删除单个容器
+docker rmi ID    删除单个镜像
+docker rmi$(docker images|grep none|awk '{print $3}'|sort -r )   删除所有镜像
+
+容器迁移
+docker export  容器ID > /home/export.tar   导出
+cat  /home/export.tar |docker import - busybox-1-export:latest  导入export.tar
+ docker save debian > /home/save.tar 将debian 容器打包
+ docker load < /home/save.tar 在另一台服务器上加载打包文件
+ 
+ 运行一个新容器：
+docker run -h="activemq" --name activemq -d -p 51000:22 -p 51001:3306 -p 51003:6379 -p 51002:6381 debian02 /etc/rc.local
+
+从容器中拷贝文件，当容器已经关闭后，在里面的文件还可以拷贝出来
+sudo docker cp  容器ID:/etc/debian_version .  把容器中的文件拷贝到当前目录
+
+cat ubuntu-14.04-x86-minimal.tar.gz |docker import - ubuntu:14.04
+
+

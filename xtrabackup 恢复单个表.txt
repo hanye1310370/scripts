@@ -1,0 +1,117 @@
+一、安装与备份
+
+
+1. 下载安装XtraBackup
+$wget http://www.percona.com/redir/downloads/XtraBackup/LATEST/binary/tarball/percona-xtrabackup-2.2.5-5027-Linux-x86_64.tar.gz
+$tar xf percona-xtrabackup-2.2.5-5027-Linux-x86_64.tar.gz
+#cd percona-xtrabackup-2.2.5-Linux-x86_64/bin
+#cp * /usr/bin
+
+
+2. 创建XtraBackup备份用户，只需要RELOAD, LOCK TABLES, REPLICATION CLIENT权限即可
+mysql> CREATE USER  'bkpuser'@'localhost' IDENTIFIED BY 's3cret';
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> GRANT RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO 'bkpuser'@'localhost';
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> FLUSH PRIVILEGES;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> use test;
+Reading table information for completion of table and column names
+You can turn off this feature to get a quicker startup with -A
+
+
+3.建表
+Database changed
+mysql>  CREATE TABLE `export_test` (
+    ->    `a` int(11) NOT NULL,
+    ->    `b` int(11) DEFAULT NULL,
+    ->    `c` int(11) DEFAULT NULL,
+    ->    PRIMARY KEY (`a`),
+    ->    UNIQUE KEY `b` (`b`)
+    ->  ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+Query OK, 0 rows affected (0.01 sec)
+
+mysql> insert into export_test values(1,3,5);
+Query OK, 1 row affected (0.00 sec)
+
+mysql> select * from export_test;
++---+------+------+
+| a | b    | c    |
++---+------+------+
+| 1 |    3 |    5 |
++---+------+------+
+1 row in set (0.00 sec)
+
+ 
+
+4.innobackupex备份
+
+$innobackupex --defaults-file=/db/mysql5.6/my.cnf -user=bkpuser  -password=s3cret   -socket=/db/mysql5.6/logs/mysql.sock /home/mysqlweb
+
+ 
+
+5. 查看备份大小
+$du -sh 2014-10-23_10-23-36/
+402M    2014-10-23_10-23-36/
+
+
+6.准备apply-log
+apply-log前的情况
+$find . -name 'export_test*'
+./export_test.frm
+./export_test.ibd
+
+$innobackupex --apply-log --export /home/mysqlweb/2014-10-23_10-23-36
+
+
+apply-log后，多了exp和cfg文件
+$find . -name 'export*'
+./export_test.frm
+./export_test.ibd
+./export_test.exp
+./export_test.cfg
+
+ 
+
+二、单表恢复
+1.新建表export_test
+mysql>  CREATE TABLE `export_test` (
+    ->         `a` int(11) NOT NULL,
+    ->         `b` int(11) DEFAULT NULL,
+    ->         `c` int(11) DEFAULT NULL,
+    ->         PRIMARY KEY (`a`),
+    ->         UNIQUE KEY `b` (`b`)
+    ->       ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+Query OK, 0 rows affected (0.02 sec)
+
+2.丢弃表空间
+mysql> ALTER TABLE export_test DISCARD TABLESPACE;      
+Query OK, 0 rows affected (0.00 sec)
+
+
+3.拷贝备份目录中的ibd,cfg,exp 到mysql的datadir目录
+mysql> system cp /home/mysqlweb/2014-10-23_10-23-36/test/export_test.{ibd,exp,cfg} /db/mysql5.6/data/test
+
+mysql> system ls /db/mysql5.6/data/test/export_test*
+/db/mysql5.6/data/test/export_test.cfg  /db/mysql5.6/data/test/export_test.ibd
+/db/mysql5.6/data/test/export_test.frm
+
+
+4.导入表空间
+mysql> ALTER TABLE export_test IMPORT TABLESPACE;
+Query OK, 0 rows affected (0.01 sec)
+
+mysql> system ls /db/mysql5.6/data/test/export_test*
+/db/mysql5.6/data/test/export_test.cfg  /db/mysql5.6/data/test/export_test.ibd
+/db/mysql5.6/data/test/export_test.frm
+
+mysql> select * from export_test;
++---+------+------+
+| a | b    | c    |
++---+------+------+
+| 1 |    3 |    5 |
++---+------+------+
+1 row in set (0.00 sec)

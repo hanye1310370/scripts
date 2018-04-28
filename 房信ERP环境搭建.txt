@@ -1,0 +1,593 @@
+﻿了解本机linux的环境是安装任何软件的基础，这样可以检测软件的兼容性等问题，以免发生问题。可以使用lsb_release -a命令来查看：
+root@test:~# lsb_release -a
+No LSB modules are available.
+Distributor ID:	Debian
+Description:	Debian GNU/Linux 8.6 (jessie)
+Release:	8.6
+Codename:	jessie
+
+1:debian服务器搭建
+     ISO镜像：http://mirrors.sohu.com/debian-cd/
+	 这里选择的是：http://mirrors.sohu.com/debian-cd/8.6.0-live/amd64/iso-hybrid/debian-live-8.6.0-amd64-standard.iso   镜像
+2：配置网络
+    	 root@debian45:/home/soft/node-v4.8.0-linux-x64/bin# vim /etc/network/interfaces
+
+             # This file describes the network interfaces available on your system
+             # and how to activate them. For more information, see interfaces(5).
+             
+             source /etc/network/interfaces.d/*
+             
+             # The loopback network interface
+             auto lo
+             iface lo inet loopback
+             
+             # The primary network interface
+             auto eth0
+             allow-hotplug eth0     #网卡名字
+             iface eth0 inet static #静态获取ip地址
+             address 192.168.1.45   #ip地址
+             gateway 192.168.1.1    #网关
+             netmask 255.255.255.0  #掩码
+3：安装lnmp+redis
+     参考：https://blog.linuxeye.cn/31.html
+	  备注：项目都安装存放在/usr/local下面
+	   mysql数据库：/data/mysql  需要根据磁盘更改位置（/etc/my.cnf    [mysqld]   datadir=位置）
+       对应版本：root@debian45:~# nginx  -v
+                     nginx version: nginx/1.12.0
+                 root@debian45:~# php -v
+                     PHP 7.0.20 (cli) (built: Jun 19 2017 16:51:52) ( NTS )
+                     Copyright (c) 1997-2017 The PHP Group
+                     Zend Engine v3.0.0, Copyright (c) 1998-2017 Zend Technologies
+                     with Zend OPcache v7.0.20, Copyright (c) 1999-2017, by Zend Technologies
+                 root@debian45:~# mysql --version
+                     mysql  Ver 14.14 Distrib 5.7.18    
+                 root@debian45:~# redis-server  -v
+                     Redis server v=3.2.9					 
+	  
+4：安装node  
+       
+      cd /home/soft
+      wget https://nodejs.org/dist/v4.8.0/node-v4.8.0-linux-x64.tar.gz
+      tar xf node-v4.8.0-linux-x64.tar.gz
+      加入环境变量
+       export PATH=/usr/local/nginx/sbin:/usr/local/php/bin:/usr/local/mysql/bin:/home/soft/node-v4.8.0-linux-x64/bin:/home/soft/node-v4.8.0-linux-x64/lib/node_modules/yarn/bin:/home/soft/node_modules/gulp/bin:$PATH
+5：安装nodejs-5.12
+       参考：https://github.com/nodesource/distributions
+	   # Using Ubuntu
+         curl -sL https://deb.nodesource.com/setup_5.x | sudo -E bash -
+         sudo apt-get install -y nodejs   （ /usr/bin/env: node: No such file or directory）
+         
+       # Using Debian, as root
+         curl -sL https://deb.nodesource.com/setup_5.x | bash -
+         apt-get install -y nodejs
+		 
+		 
+		 
+	sudo rpm -i http://download.fedoraproject.org/pub/epel/beta/7/x86_64/epel-release-7-0.2.noarch.rpm
+2.安装
+
+sudo yum install nodejs	 
+		 
+		 
+		 
+		 
+		 
+		 
+		 
+		 
+6：安装 git 等环境
+   apt-get install gcc fish libevent-dev build-essential sudo sysv-rc-conf iptraf autoconf git checkinstall openssl git
+7:安装composer
+    cd /usr/local/bin
+      curl -s https://getcomposer.org/installer | php
+      chmod a+x composer.phar     
+      composer.phar self-update      
+      mv composer.phar composer	
+8：clone 代码到测试服务器
+        A:初始化代码       cd /home/ops/erp     git init
+        B:初始化仓库代码   git remote add origin git@gitlab.1fangxin.cn:fangxin-tech/erp.git
+        C:拉去代码到本地   git pull origin   release/QGKR
+9:在项目目录下安装gulp
+
+    yum install -g yarn
+	 yarn add gulp
+	 curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+	 apt-get update && sudo apt-get install yarn
+	 
+	 如果你要移除的话，可以使用yarn remove package_name 比如：
+yarn remove gulp
+
+
+在 CentOS、Fedora、RHEL 上，你可以通过 RPM 包仓库安装 Yarn。
+
+sudo wget https://dl.yarnpkg.com/rpm/yarn.repo -O /etc/yum.repos.d/yarn.repo
+如果你没有安装 Node.js，你也应该配置 NodeSource 仓库：
+
+curl --silent --location https://rpm.nodesource.com/setup_6.x | sudo bash -
+然后你可以简单的：
+
+sudo yum install yarn
+## 或 ##
+sudo dnf install yarn
+
+10:安装supserver
+	 ccc
+	 apt-get install supervisor
+	 
+11:初始化环境 （属主用户操作）
+cp .env.example  .env
+php artisan key:generate
+        gulp  
+		composer install      环境配置
+	　今天在部署服务器的时候，使用composer来安装依赖。遇到了
+
+　　The Process class relies on proc_open, which is not available on your PHP installation.
+
+　　开始的时候，我有些不知所措，于是冷静下来思考一番，然后goolge了一下
+
+解决方法：
+
+　　在php.ini中，找到disable_functions选项，看看后面是否有proc_open函数被禁用了，如果有的话，去掉即可	
+		
+		php artisan key:generate
+		APP_KEY=base64:NEzRHhTw4ljBJjuQiukdBIeEv4qe0biNb6ENHirTfEM=
+注：slb后面的realserver 的主从APP_KEY 必须保持一致。
+	    php artisan optimize  环境优化
+		php artisan  migrate  数据迁移
+		php artisan  queue:restart  重启服务
+		
+	    php artisan warrant:overdue-reminder  逾期站内信脚本命令
+
+处理：
+	
+	ERROR in plugin "gulp-notify"
+	 apt-get install libnotify-bin
+	 
+	 
+	 
+jenkins_da="/home/jenkins/ops/workspace/fx_erp_test"
+erp_da="/home/ops/erp/erp/"
+cd $erp_da
+cp ${jenkins_da}/* ${erp_da} -fr
+composer install
+gulp
+ sudo chmod -R 777 $erp_da
+ php  artisan   migrate
+ php artisan config:cache
+ php  artisan  queue:restart
+php artisan cache:clear
+php  artisan hot-fix-zz 
+
+
+jenkins_date="/home/jenkins/ops/workspace/构建内部test环境"
+erp_date="/home/ops/erp/erptest"
+rm $erp_date/database/migrations/ -fr
+rm $erp_date/public/ -fr
+cp -fr $jenkins_date/* $erp_date/
+#rm -fr $jenkins_date/* 
+cd $erp_date/
+sudo chmod -R 777  $erp_date
+composer install
+/home/ops/erp/erptest/node_modules/.bin/gulp
+    #sudo chmod -R 777 $erp_date
+    php  artisan   migrate --force
+    #expect /home/ops/migrate.sh
+    php artisan config:cache
+    php  artisan  queue:restart
+
+
+Composer的使用
+列举一些常用的。
+
+composer self-update：更新composer版本。(当然，你也可以采取下载composer.phar文件进行覆盖更新)。
+composer install：根据当前目录下的composer.json文件来安装依赖代码库。
+composer update：更新依赖代码库。
+composer create-project：创建项目。
+composer init：交互方式在当前目录下创建composer.json文件	 
+	 
+	 
+12：启动 supervisor队列
+       cd /etc/supervisor/conf.d
+	   root@debian45:/etc/supervisor/conf.d# vim qa1-member-fx-com.conf
+
+           [program:qa1-member-fx-com]
+           process_name=%(program_name)s_%(process_num)02d
+           command=/usr/local/php/bin/php /home/ops/erp/erp/artisan  queue:work redis  --sleep=3 --tries=1
+           autostart=true
+           autorestart=true
+           user=ops
+           numprocs=8
+           redirect_stderr=true
+           stdout_logfile=/home/ops/erp/erp/logs/supvisor.log
+		   
+
+13:启动队列
+     root@debian45:/etc/supervisor/conf.d# supervisorctl update
+	 root@debian45:/etc/supervisor/conf.d# supervisorctl restart all
+	 
+	 unix:///var/run/supervisor.sock no such file
+原创 2015年10月29日 01:25:35 6883
+sudo touch /var/run/supervisor.sock
+sudo chmod 777 /var/run/supervisor.sock
+sudo service supervisor restart
+	 
+	 
+安装jenkins和jdk
+   安装jdk1.8.131
+            root@debian45:/etc/supervisor/conf.d# vim /etc/apt/sources.list
+          
+          #
+          
+          # deb cdrom:[Debian GNU/Linux 8 _Jessie_ - Official Snapshot amd64 LIVE/INSTALL Binary 20160917-14:33]/ jessie main
+          
+          deb cdrom:[Debian GNU/Linux 8 _Jessie_ - Official Snapshot amd64 LIVE/INSTALL Binary 20160917-14:33]/ jessie main
+          
+          deb http://mirrors.163.com/debian/ jessie main
+          deb-src http://mirrors.163.com/debian/ jessie main
+          
+          deb http://security.debian.org/ jessie/updates main
+          deb-src http://security.debian.org/ jessie/updates main
+          
+          # jessie-updates, previously known as 'volatile'
+          deb http://mirrors.163.com/debian/ jessie-updates main
+          deb-src http://mirrors.163.com/debian/ jessie-updates main
+          deb http://ppa.launchpad.net/webupd8team/java/ubuntu trusty main   #java
+          deb-src http://ppa.launchpad.net/webupd8team/java/ubuntu trusty main  #java
+          	 
+          apt-get update
+          apt-get  install -y oracle-java8-installer
+	
+	
+	安装jenkins
+	   参考： http://pkg.jenkins-ci.org/debian/
+	      This is the Debian package repository of Jenkins to automate installation and upgrade. To use this repository, first add the key to your system:  
+		     wget -q -O - https://pkg.jenkins.io/debian/jenkins.io.key | sudo apt-key add -          
+          Then add the following entry in your /etc/apt/sources.list:          
+            deb https://pkg.jenkins.io/debian binary/          
+          Update your local package index, then finally install Jenkins:          
+            sudo apt-get update
+            sudo apt-get install jenkins
+			
+			初始密码位置：cat /data/jenkins/secrets/initialAdminPassword
+
+	su -erp
+	crontab -e
+* * * * * /usr/local/php/bin/php /home/erp/haerbin/erp/artisan schedule:run >> /dev/null 2>&1
+* * * * * /usr/local/php/bin/php /home/erp/tianjin/erp/artisan schedule:run >> /dev/null 2>&1
+
+	
+	
+	
+	
+	requirepass redis12300.
+	
+gitlab更新笔记
+sudo apt-get install gitlab-ce
+
+sudo gitlab-ctl reconfigure
+
+sudo gitlab-ctl restart
+sudo apt-get update
+
+sudo apt-get install gitlab-ce
+
+sudo gitlab-ctl reconfigure
+
+sudo gitlab-ctl restart
+
+502处理如下
+
+sudo usermod -aG gitlab-www www
+
+service nginx restart	
+
+
+	
+php -i | grep configure | sed -e "s/Configure Command => //; s/'//g"
+
+
+
+
+郑州访问链接：
+http://zz.1fangxin.net/?zlld=910
+ll /usr/local/openssl/lib/libcrypto.so.1.0.0
+
+
+erp@iZ2ze3xrghth6n3ty61c33Z:~$ cat /etc/ansible/hosts 
+[erp]
+10.29.130.91 ansible_ssh_user=erp ansible_ssh_port=7080
+10.29.129.179
+[147server]
+10.29.130.91
+[142server]
+10.29.129.179
+
+	
+	
+软件下载位置：/var/cache/apt/archives/
+
+
+城市对应码表：erp_cities
+省会对应码表：erp_provinces
+
+问题：
+Saving To...
+- resources/assets/css/Erp/erp.css
+[14:13:49] gulp-notify: [Laravel Elixir] Sass Compiled!
+[14:13:49] gulp-notify: [Error in notifier] Error in plugin 'gulp-notify'
+解决方法：
+apt-get install libnotify-bin
+
+
+
+mysqldump -uzz-fx-com -p -hrds-1fangxin.mysql.rds.aliyuncs.com zz-fx-com --single-transaction --max_allowed_packet=2G |gzip > /mnt/oliver/zz-fx-com_20171211.sql.gz
+17:32
+
+/usr/local/mysql/bin/mysqldump -ufangxin_erp_hb -p'Fang2_xin0_erp_huabei10' -hrm-2zerjfvo378amm655.mysql.rds.aliyuncs.com bj_lianz --set-gtid-purged=OFF |gzip > /data/backup/mysql/lianzhong-`date +%Y%m%d%H%M%S`.gz
+
+
+bargain	other_commission_reasons	其它分佣原因	[]	multiple	[]
+ERP部署
+  1：分佣比例 出现传参失败
+       修改erp_settings表里面的字段 category值为bargain name为 锁定比例 的值为 保持id不变
+	    bargain	other_commission_reasons	其它分佣原因	[]	multiple	[]
+	    
+  2: 修改网站的城市id和省份id
+     找到erp_cities表 找到name对应环境省份  找到id和province_id替换erp_user表里的city_id和province_id（除了18818881888字段）
+
+php artisan elastic:create-index "App\Index\DoingLogIndex"
+11:23
+
+
+
+php artisan scout:import "App\Models\Management\DoingLog"
+
+
+安装pip2
+sudo apt-get install python-pip python-dev build-essential
+安装pip3
+sudo apt-get install python3-pip python-dev build-essential
+
+
+
+
+nginx与php整合：
+整合：
+cd /usr/local/nginx/conf/
+vi nginx.conf
+找到如下几行，去掉注释，并修改，注意红色部分：
+        location ~ \.php$ {
+            root           html;
+            fastcgi_pass   127.0.0.1:9000;
+            fastcgi_index  index.php;
+            fastcgi_param  SCRIPT_FILENAME  $document_root$fastcgi_script_name;
+            include        fastcgi_params;
+        }
+如图：
+wKioL1Uste-inaiOAADyx8StFiw119.jpg
+/usr/local/nginx/sbin/nginx -t         （检查配置文件是否正确）
+/usr/local/nginx/sbin/nginx -s reload  （reload重新加载配置文件，关闭并启动新的worker进程）
+
+测试：
+vi /usr/local/nginx/html/index.php
+<?php
+phpinfo();
+?>
+
+
+
+
+查看access.log中哪个IP访问最多？
+awk '{print $1}' access.log| sort | uniq -c |sort -rn -k 1  | head -1
+
+
+
+1、关闭firewall：
+
+service firewalld stop
+systemctl disable firewalld.service #禁止firewall开机启动
+1
+2
+2、安装iptables防火墙
+
+yum install iptables-services #安装
+1
+3、编辑iptables防火墙配置
+
+vi /etc/sysconfig/iptables #编辑防火墙配置文件
+1
+下边是一个完整的配置文件：
+
+Firewall configuration written by system-config-firewall
+
+Manual customization of this file is not recommended.
+
+*filter
+
+:INPUT ACCEPT [0:0]
+
+:FORWARD ACCEPT [0:0]
+
+:OUTPUT ACCEPT [0:0]
+
+-A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+-A INPUT -p icmp -j ACCEPT
+
+-A INPUT -i lo -j ACCEPT
+
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 22 -j ACCEPT
+
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 80 -j ACCEPT
+
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 3306 -j ACCEPT
+
+-A INPUT -j REJECT --reject-with icmp-host-prohibited
+
+-A FORWARD -j REJECT --reject-with icmp-host-prohibited
+
+COMMIT
+
+:wq! #保存退出
+
+service iptables start #开启
+systemctl enable iptables.service #设置防火墙开机启动
+
+
+
+
+for in in hsbl jinse lianzhong qianshi;do cd $i &&chmod -R 777  storage/  && chmod  -R 777  bootstrap/cache/ ;done
+for in  hsbl jinse lianzhong qianshi;do cd $i &&chmod -R 777  storage/  && chmod  -R 777  bootstrap/cache/ ;done
+
+
+
+root@yjb:/home/ops/erp# cat wechat_web_online.sh 
+#!/bin/bash
+cd /home/ops/erp/wechat_web
+git pull origin master
+composer install
+yarn install
+php artisan migrate:web
+npm run dev
+
+
+
+
+
+
+
+php artisan web:push-all-communities 159
+php artisan web:push-all-agents
+php artisan web:push-all-supporting
+然后queue:restart
+然后：
+然后依次执行这两条命令。
+php artisan elastic:create-index "App\Index\DoingLogIndex"
+php artisan scout:import "App\Models\Management\DoingLog"
+
+
+net.ipv4.tcp_timestamps = 0
+
+      ./configure  --prefix=/usr/local/php --with-config-file-path=/usr/local/php/etc --with-config-file-scan-dir=/usr/local/php/etc/php.d --with-fpm-user=www --with-fpm-group=www --enable-fpm --enable-opcache --disable-fileinfo --enable-mysqlnd --with-mysqli=mysqlnd --with-pdo-mysql=mysqlnd --with-iconv-dir=/usr/local --with-freetype-dir --with-jpeg-dir --with-png-dir --with-zlib --with-libxml-dir=/usr --enable-xml --disable-rpath --enable-bcmath --enable-shmop --enable-exif --enable-sysvsem --enable-inline-optimization --with-curl=/usr/local --enable-mbregex --enable-mbstring --with-mcrypt --with-gd --enable-gd-native-ttf --with-openssl --with-mhash --enable-pcntl --enable-sockets --with-xmlrpc --enable-ftp --enable-intl --with-xsl --with-gettext --enable-zip --enable-soap --disable-debug
+
+make ZEND_EXTRA_LIBS='-liconv' 
+make install
+
+
+
+没看经纪人的，我再看看
+17:02
+
+
+
+那这个还有什么地方要对应的修改
+17:03
+
+
+
+统一在原有数据上加3个月后，由于一些年、月的列不对应，再单独修改年、月
+先修改对应的月份
+update erp_salary_summaries set month = month - 9  where month = 12
+之后修改一些需要更改的年份
+update erp_salary_summaries set year = year + 1  where month = 3
+2017年12月份   修改成  2018年3月份
+
+
+删除mysql慢语句的会话：
+for i in mysql -uzz-fx-com -p1vCEclfJeuoqlkKN -hrds-1fangxin.mysql.rds.aliyuncs.com zm-fx-com -e "show processlist;"|grep "Sending data"|awk '{print $1}'; do mysql -uzz-fx-com -p1vCEclfJeuoqlkKN -hrds-1fangxin.mysql.rds.aliyuncs.com zm-fx-com  -e "kill $i"; done
+
+show variables like '%log%';
+PURGE MASTER LOGS BEFORE DATE_SUB( NOW( ), INTERVAL 3 DAY);
+PURGE MASTER LOGS TO ‘mysql-bin.010′;
+PURGE MASTER LOGS BEFORE ‘2008-06-22 13:00:00′;
+根据位置恢复：
+mysqlbinlog --start-position="3266" --stop-position="3711" mysql-bin.000048 |mysql -uroot -p
+根据时间点恢复：
+mysqlbinlog --start-datetime="2017-03-10 15:38:53" --stop-datetime="2017-03-10 16:04:04" mysql-bin.000048 |mysql -uroot -p
+
+
+
+新环境导入经纪人的方法：
+
+1. 如果没有 erp_temp_agents 表，那么执行 SQL
+CREATE TABLE `erp_temp_agents` (
+  `company_name` varchar(255) DEFAULT NULL,
+  `name` varchar(255) DEFAULT NULL,
+  `gender` varchar(255) DEFAULT NULL,
+  `id_card` varchar(255) DEFAULT NULL,
+  `mobile` bigint(11) DEFAULT NULL,
+  `org` varchar(255) DEFAULT NULL,
+  `position` varchar(255) DEFAULT NULL,
+  `grade` varchar(255) DEFAULT NULL,
+  `role` varchar(255) DEFAULT NULL,
+  `worked_at` varchar(255) DEFAULT NULL,
+  `password` int(11) DEFAULT NULL,
+  `工资类别` int(11) DEFAULT NULL,
+  `work_number` varchar(255) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+2. 检查 csv 一定要包含 公司名称 company_name  姓名 name  性别 gender  身份证 id_card  手机 mobile  部门 org  角色 role  职务 position 职级 grade  入职时间 worked_at  | 工号（可选） work_number
+
+3. 导入到 erp_temp_agents 表
+
+4. 到 ssh 下，执行  php artisan member:import-hb-agent  
+
+5. 如果提示 *** 部门和角色不匹配，那么到  erp_temp_agents 表找到这个信息，发给实施人员说明这个人又问题，再把这个人给删掉，接着执行命令。（执行过的会自动跳过，会自动判重
+
+
+
+
+
+新环境部署后的数据抓取操作
+creeper:area zhengzhou                                     抓取指定城市下的区域
+  creeper:bus zhengzhou                                     抓取指定城市下的公交线路
+  creeper:business                                  同步区域下的商圈
+  creeper:community                                 同步商圈下的小区
+  creeper:generate-region-business  zhengzhou                生成区域和商圈
+  creeper:import zhengzhou                          导入目标城市楼盘信息  (后面的城市名称换成对应的，此操作会自动补全行政区和商圈表)
+  creeper:import-traffic                            通过页面抓取完交通数据之后，导入到交通信息表（如果要跑公交站和地铁站数据，必须先执行这个操作）
+
+
+注意：
+导入公交线路步骤如下
+1. 抓取公交线路  creeper:bus zhengzhou  命令执行
+2. 登录 erp admin 管理后台，周边配套里面有个交通管理，列表页面右上角有个批量导入，选择对应城市，开始抓取（这个可以开多个页面）
+3. 以上两布完成后，执行 creeper:import-traffic 导入交通内容从临时表到正式表
+12:02
+
+
+
+大家保存一下数据抓取的命令。需要的时候配合实施部门进行数据导入。有问题随时和我沟通。
+千氏账号：18818881888  密码：110120
+
+同步agents：
+miyun.1fangxin.net/dc/sync/agent   
+房源报错查询；
+select * from erp_inner_messages WHERE relation_uuid= 'BJSYYLYQSYC10715';   #房源编号
+select * from erp_agents where id = 1143 or id = 532;  
+#根据sender_id 发送人    receiver_id 接受人  
+#根据时间查询 如果sender_id为0的则不需要查询
+
+
+
+
+运了一个维:
+我房环境跑脚本
+php artisan queue:work
+ php artisan client:sync-wf-client
+运了一个维:
+所有环境
+通话记录: php artisan role:inlay-permission m.statistics-call-view
+成交分析: php artisan role:inlay-permission m.statistics-bargain-view
+
+
+清空redis中指定的key
+redis-cli -a redis12300. -n 6 keys "*custom_column:source*" |xargs redis-cli -a redis12300. -n 6 del
+产生经纬度：
+php artisan dictionary:set-district-geo --only_null
+然后查看erp_districts 的 latitude 和 longitude 字段是否有数据
+
+导入周边设施：
+php artisan creeper:import-traffic
+

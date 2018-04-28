@@ -1,0 +1,49 @@
+PHP环境安装composer命令
+[plain] view plain copy  在CODE上查看代码片派生到我的代码片
+#curl -sS https://getcomposer.org/installer | php  
+
+指定安装路径命令
+[plain] view plain copy  在CODE上查看代码片派生到我的代码片
+#curl -sS https://getcomposer.org/installer | php -- --install-dir=/tmp  
+
+如果把composer.phar放在系统的 PATH 目录中，就能在全局访问composer.phar。 在Unix系统中，你甚至可以在使用时不加 php 前缀。可以执行这些命令让 composer 在你的系统中进行全局调用：
+[plain] view plain copy  在CODE上查看代码片派生到我的代码片
+#mv /tmp/composer.phar /usr/local/bin/composer  
+
+如果报TCP错误
+[plain] view plain copy  在CODE上查看代码片派生到我的代码片
+curl: (56) TCP connection reset by peer  
+
+那么开启php的openSSL拓展就可以了，windows下在php.ini文件中找到extension=php_openssl.dll，把前面的；去掉。linux下是openssl.so。然后重启服务即可。
+
+
+正常情况下，composer是被墙的，所以需要修改配置文件，改为可以用的镜像
+切换镜像的方法，参考 Composer切换镜像；
+切换好之后
+安装laravel
+
+[plain] view plain copy  在CODE上查看代码片派生到我的代码片
+composer create-project laravel/laravel --prefer-dist  
+也可以指定文件名
+[plain] view plain copy  在CODE上查看代码片派生到我的代码片
+composer create-project laravel/laravel demo--prefer-dist  
+看到set successfully.就是成功了。
+
+
+安装zan PHP
+[plain] view plain copy  在CODE上查看代码片派生到我的代码片
+composer create-project youzan/zan demo--prefer-dist  
+
+中间碰到了一个很有意思的事情
+php -m 和phpinfo显示的信息不一致。 
+
+这是因为phpinfo走的是fastcgi，php命令走的是cli，用的不是同一个php.ini。
+安装php命令能用的拓展也十分的简单
+以安装mbstring为例
+
+[plain] view plain copy  在CODE上查看代码片派生到我的代码片
+yum install -y php-mbstring  
+
+
+安装指定 laravel 框架  
+composer create-project laravel/laravel=5.0.* --prefer-dist   

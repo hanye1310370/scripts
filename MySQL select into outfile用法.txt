@@ -1,0 +1,87 @@
+MySQL select into outfile用法
+select into outfile用法
+SELECT ... FROM TABLE_A
+INTO OUTFILE "/path/to/file"
+FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"'
+LINES TERMINATED BY '\n';
+load data infile用法
+LOAD DATA INFILE "/path/to/file" INTO TABLE table_name;
+注意：如果导出时用到了FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"' LINES TERMINATED BY '\n'语句，那么LODA时也要加上同样的分隔限制语句。还要注意编码问题。
+解决select into outfile，不能导出到自定义目录问题
+Recent Ubuntu Server Editions (such as 10.04) ship with AppArmor and MySQL's profile might be in enforcing mode by default. You can check this by executing sudo aa-status like so:
+
+> sudo aa-status
+    5 profiles are loaded.
+    5 profiles are in enforce mode.
+       /usr/lib/connman/scripts/dhclient-script
+       /sbin/dhclient3
+       /usr/sbin/tcpdump
+       /usr/lib/NetworkManager/nm-dhcp-client.action
+       /usr/sbin/mysqld
+    0 profiles are in complain mode.
+    1 processes have profiles defined.
+    1 processes are in enforce mode :
+       /usr/sbin/mysqld (1089)
+    0 processes are in complain mode.
+If mysqld is included in enforce mode, then it is the one probably denying the write. Entries would also be written in /var/log/messages when AppArmor blocks the writes/accesses. What you can do is edit /etc/apparmor.d/usr.sbin.mysqld and add /data/ and /data/* near the bottom like so:
+
+/usr/sbin/mysqld {
+    ...
+    /var/log/mysql/ r,
+    /var/log/mysql/* rw,
+    /var/run/mysqld/mysqld.pid w,
+    /var/run/mysqld/mysqld.sock w,
+    /data/ r,
+    /data/* rw,
+}
+And then make AppArmor reload the profiles.
+
+> sudo /etc/init.d/apparmor reload
+
+
+mysql的select into outfile与load data用法 (2012-09-28 14:40:56)转载▼
+标签： 导入导出 it	分类： mysql
+MYSQL不支持:
+Select * Into new_table_name from old_table_name;
+替代方法:
+Create table new_table_name (Select * from old_table_name);
+***************************************************************************************************************
+1.select info outfile的问题
+在导出表中数据时遇到了如下错误：
+mysql> select * from action_bak limit 10 into outfile '/home/hyh/test1';
+ERROR 1 (HY000): Can't create/write to file '/home/hyh/test1' (Errcode: 13)
+原来还是test1所在目录的问题，默认的目录是/var/lib/mysql/tordb :(action_bak是tordb中的表)
+mysql> select * from action_bak limit 10 into outfile 'test1';
+Query OK, 10 rows affected (0.00 sec)
+或者也可以指定在/tmp目录下 :
+mysql> select * from action_bak limit 10 into outfile '/tmp/test1';
+Query OK, 10 rows affected (0.00 sec)
+find上面两个文件test1，输出如下：
+hyh@hyh-desktop:~$ sudo find / -name test1
+/var/lib/mysql/tordb/test1
+/tmp/test1
+************************************************************************************************
+2.load data infile的问题
+今天在导入mysql数据的时候，出现下面的错误：
+
+mysql> load data infile '/home/hyh/my_work/data/action_bak_2010_07_30/action_bak_2010_07_30' into table action_bak;
+mysql> ERROR 13 (HY000): Can't get stat of '/home/hyh/my_work/data/action_bak_2010_07_30/action_bak_2010_07_30' (Errcode: 13)
+
+开始还以为是action_bak_2010_07_30文件权限或者是mysql的root用户权限的问题，后来想不对呀，mysql的root用户是超级用户，肯定有权限的，那问题就出在action_bak_2010_07_30文件的权限上，后来把action_bak_2010_07_30的权限改成777，执行操作后还是不行。
+
+原来是action_bak_2010_07_30文件所在的文件目录的问题，这个好办，换到/tmp/action_bak_2010_07_30，执行上述操作看看：
+mysql> load data infile '/tmp/action_bak_2010_07_30' into table action_bak;
+Query OK, 14 rows affected (0.01 sec)
+Records: 14 Deleted: 0 Skipped: 0 Warnings: 0
+之所以要用/tmp目录的原因是mysql默认使用了/tmp作为临时读写目录。
+
+mysql> show variables like '%tmpdir%';
++-------------------+-------+
+| Variable_name | Value |
++-------------------+-------+
+| slave_load_tmpdir | /tmp |
+| tmpdir | /tmp |
++-------------------+-------+
+2 rows in set (0.00 sec)
+ 
+总结，select into file 和load data outfile都是目录的问题，mysql机制有待深入研究。

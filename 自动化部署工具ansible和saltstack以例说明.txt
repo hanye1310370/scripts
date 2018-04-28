@@ -1,0 +1,310 @@
+# 自动化部署服务器环境 #
+
+	
+> 自动化部署服务器环境 先来看ansible和saltstack 来部署nginx和php服务的两个例子：
+
+## 自动化部署方案ansible案例：
+
+		我们先来看下ansible剧本roles结构：
+
+			这是一个ansible安装lnmp环境的nginx和php服务的剧本：
+
+			root@wanagwei01:/home/ansible_plb# tree
+			.
+			├── roles	--------------------------首先我们需要在剧本目录下创建roles角色目录用于存放我们将部署的task任务的每个角色的目录
+			│   ├── nginx ----------------------------------------------- nginx的剧本目录
+			│   │   ├── files ------------------------------------------  安装nginx需要的各种安装包
+			│   │   │   ├── jemalloc-5.0.1.tar.bz2
+			│   │   │   ├── nginx-1.12.1.tar.gz
+			│   │   │   ├── nginx-upload-progress-module-master.zip
+			│   │   │   └── pcre-8.41.tar.gz
+			│   │   ├── tasks --------------------------------------- tasks目录就是用来创建部署任务的任务yml文件
+			│   │   │   ├── jemalloc.yml
+			│   │   │   ├── main.yml
+			│   │   │   ├── nginxcnf.yml
+			│   │   │   ├── nginxins.yml
+			│   │   │   ├── nginxup.yml
+			│   │   │   └── pcreins.yml
+			│   │   └── templates -----------------------templates 目录就是放置 作为模板使用的配置文件等 此文件可以引用ansible定义的各种jinjia模板变量
+			│   │       ├── nginx.conf
+			│   │       └── nginx-init
+			│   └── php ---------------------------------------------- php的剧本目录
+			│       ├── files----------------------------------------- 安装php需要的各种安装包
+			│       │   ├── ImageMagick-6.9.9-11.tar.gz
+			│       │   ├── libiconv-1.15.tar.gz
+			│       │   ├── php-7.1.6.tar.gz
+			│       │   ├── redis-3.1.3.tgz
+			│       │   └── v1.9.17.tar.gz
+			│       ├── tasks ---------------------------------------- tasks任务目录
+			│       │   ├── imagick.yml
+			│       │   ├── libiconv.yml
+			│       │   ├── main.yml
+			│       │   ├── phpcnf.yml
+			│       │   ├── phpext.yml
+			│       │   ├── phpins.yml
+			│       │   ├── useradd.yml
+			│       │   └── yum.yml
+			│       └── templates ------------------------------------- 模板目录
+			│           ├── php-fpm
+			│           ├── php-fpm.conf
+			│           └── php.ini
+			└── site.yml ------------------------------- site文件是整个roles剧本的入口 使用ansible-playbook site.yml 来执行roles中的task
+
+				
+			详细解释上面的目录结构：
+					当执行ansible-playbook site.yml 命令是会通过site.yml文件中定义的内容去执行roles：
+						- hosts: debian  ------------------目标主机
+						  remote_user: root
+						  roles: --------------------------角色
+						    - nginx -----------------------角色名称
+						- hosts: centos
+						  remote_user: root
+						  roles:
+						    - php
+					在roles中找到对应的角色并执行其中tasks中的main.yml文件执行task任务 遇到files模块会自动在当前角色目录下如php目录下找到files目录
+					找到定义等的文件名称做文件操作（copy）
+					并执行task中的shell命令执行linux的shell命令，这个例子很简单， 但是已经解决了自动安装的问题
+			
+			看一下task文件的内容：
+
+					root@wanagwei01:/home/ansible_plb# cat roles/php/tasks/main.yml 
+					- include: yum.yml ------------------------------include使用方式 方便的对步骤进行切分，将任务层次化并包含到一个main.yml中顺序执行 
+					- include: useradd.yml
+					- include: imagick.yml
+					- include: libiconv.yml
+					- include: phpins.yml
+					- include: phpcnf.yml
+					- include: phpext.yml
+					
+					root@wanagwei01:/home/ansible_plb# cat roles/php/tasks/phpins.yml ------------------------- php的安装yml文件
+					- name: "php" ----------------------------------------------------------------------------- 声明task任务名称
+					  copy: ----------------------------------------------------------------------------------- 使用copy模块做文件操作
+					    src: php-7.1.6.tar.gz  -----------------------------------------------源，会自动找到当前角色目录下的files文件目录找到文件
+					    dest: "/usr/local/src/php-7.1.6.tar.gz" ----------------------------------------------- 目标目录，需要指定目标绝对路径
+					    owner: root
+					    group: root
+					    mode: 0644
+					- name: "install php" --------------------声明 安装php的任务名称，上部中已经拷贝了安装包 这个进行shell命令解压、编译、安装
+					  shell: cd /usr/local/src/ && tar xf php-7.1.6.tar.gz && cd php-7.1.6 && ./configure --prefix=/usr/local/php --with-config-file-path=/usr/local/php/etc --with-config-file-scan-dir=/usr/local/php/etc/php.d --with-fpm-user=www --with-fpm-group=www --enable-fpm --enable-opcache --disable-fileinfo --enable-mysqlnd --with-mysqli=mysqlnd --with-pdo-mysql=mysqlnd --with-iconv --with-freetype-dir --with-jpeg-dir --with-png-dir -with-zlib --with-libxml-dir=/usr --enable-xml --disable-rpath --enable-bcmath --enable-shmop --enable-exif --enable-sysvsem --enable-inline-optimization --with-curl=/usr/local --enable-mbregex --enable-mbstring --with-mcrypt --with-gd --enable-gd-native-ttf --with-openssl --with-mhash --enable-pcntl --enable-sockets --with-xmlrpc --enable-ftp --enable-intl --with-xsl --with-gettext --enable-zip --enable-soap --disable-debug && make ZEND_EXTRA_LIBS='-liconv' && make install
+					
+					root@wanagwei01:/home/ansible_plb# cat roles/php/tasks/phpcnf.yml -------------------------  这里就要引用模板templates了
+					- name: "php-fpm" -------------------------------------------------------------------------  声明task名称
+					  template: --------------------------------------------  模板模块使用方式和copy模块一样 会自动找当前角色下的templates目录
+					    src: php-fpm.conf
+					    dest: /usr/local/php/etc/php-fpm.conf
+					    owner: root
+					    group: root
+					    mode: 0644
+					
+					- name: "php-ini"
+					  template: 
+					    src: php.ini
+					    dest: /usr/local/php/etc/php.ini
+					    owner: root
+					    group: root
+					    mode: 0644
+					
+					- name: "php-fpminit"
+					  template:
+					    src: php-fpm
+					    dest: /etc/init.d/php-fpm
+					    owner: root
+					    group: root
+					    mode: 0755
+					- name: "chkconfig enable php-fpm"
+					  shell: chkconfig --add php-fpm && chkconfig php-fpm on
+
+
+## 自动化部署方案saltstack案例：
+
+		saltstack的master配置文件配置：
+				root@wanagwei01:/home# egrep '^[a-z]|^ ' /etc/salt/master
+				interface: 0.0.0.0 ---------------------------------------------- saltstack master服务的监听地址
+				user: root ------------------------------------------------------  salt执行用户
+				file_roots: -----------------------------------------------------  saltenv环境根目录
+				  base: ---------------------------------------------------------  base环境
+				    - /home/salt_env/base ---------------------------------------  base环境目录路径
+				  lnmp: ---------------------------------------------------------  lnmp环境
+				    - /home/salt_env/lnmp ---------------------------------------  lnmp环境目录
+				pillar_roots: ---------------------------------------------------  pillar环境根目录
+				  base:
+				    - /home/salt_pillar/base ------------------------------------  base pillar环境目录
+				  lnmp:
+				    - /home/salt_pillar/lnmp ------------------------------------  lnmp pillar环境目录
+		
+        saltstack的env环境目录结构：
+
+				root@wanagwei01:/home/salt_env# tree
+				.
+				├── base ------------------------- base环境：将自动化部署中自动安装前需要提前做的事情,软件源添加、系统更新，内核优化等放在这里进行
+				│   ├── init
+				│   │   ├── epel.sls
+				│   │   ├── init.sls
+				│   │   └──sysctl.sls
+				│   └── top.sls ------------------ topfile 为环境的入口文件
+				└── lnmp -------------------------- 为了安装lnmp 定义一个lnmp环境目录用于区分环境的作用 
+				    ├── lnmp ----------------------  创建环境下的任务目录 
+				    │    └── install.sls -----------  创建任务的sls文件 
+				    ├── modules --------------------  创建一个集合目录用来放置 各个需要安装的软件的任务目录
+				    │   ├── imagick -----------------  软件imagick的安装部署任务目录
+				    │   │   ├── files ---------------  files内放置此任务的软件包
+				    │   │   │   └── ImageMagick-6.9.9-11.tar.gz
+				    │   │   └── install.sls -----------  此任务的安装文件
+				    │   ├── jemalloc
+				    │   │   └── install.sls
+				    │   ├── libevent
+				    │   │   ├── files
+				    │   │   │   ├── jemalloc-5.0.1.tar.bz2
+				    │   │   │   ├── libevent-2.0.22-stable.tar.gz
+				    │   │   │   ├── nginx-1.12.1.tar.gz
+				    │   │   │   ├── nginx-upload-progress-module-master.zip
+				    │   │   │   └── pcre-8.41.tar.gz
+				    │   │   └── install.sls
+				    │   ├── libiconv
+				    │   │   ├── files
+				    │   │   │   └── libiconv-1.15.tar.gz
+				    │   │   └── install.sls
+				    │   ├── nginx ------------------------------- nginx任务目录
+				    │   │   ├── files --------------------------- nginx任务的文件目录，放置nginx的安装包和配置文件
+				    │   │   │   ├── jemalloc-5.0.1.tar.bz2
+				    │   │   │   ├── nginx-1.12.1.tar.gz
+				    │   │   │   ├── nginx-1.9.1.tar.gz
+				    │   │   │   ├── nginx.conf ------------------- 配置文件需要预先设定为环境通用的模板
+				    │   │   │   ├── nginx-init ------------------- nginx启动脚本
+				    │   │   │   └── pcre-8.41.tar.gz
+				    │   │   ├── install.sls ---------------------- nginx安装部署任务文件
+				    │   │   └── service.sls ---------------------- nginx服务启动文件
+				    │   ├── nginxup
+				    │   │   ├── files
+				    │   │   │   └── nginx-upload-progress-module-master.zip
+				    │   │   └── install.sls
+				    │   ├── pcre
+				    │   │   ├── files
+				    │   │   │   └── pcre-8.41.tar.gz
+				    │   │   └── install.sls
+				    │   ├── php ---------------------------------- php任务目录
+				    │   │   ├── files ---------------------------- php任务的文件目录，放置安装包和配置文件
+				    │   │   │   ├── ImageMagick-6.9.9-11.tar.gz
+				    │   │   │   ├── libiconv-1.15.tar.gz
+				    │   │   │   ├── php-7.1.6.tar.gz
+				    │   │   │   ├── php-fpm ---------------------- php启动文件 作为通用模板
+				    │   │   │   ├── php-fpm.conf------------------ php-fpm配置文件 作为通用模板
+				    │   │   │   ├── php.ini ---------------------- php.ini配置文件 作为通用模板
+				    │   │   │   ├── redis-3.1.3.tgz
+				    │   │   │   └── v1.9.17.tar.gz
+				    │   │   └── install.sls
+				    │   ├── pkg
+				    │   │   └── make.sls
+				    │   └── user
+				    │       └── www.sls
+				    └── user
+				        └── www.sls
+
+
+		看下几个saltstack的sls文件格式和编写内容解释：
+				
+				root@wanagwei01:/home/salt_env# cat base/top.sls  top文件是saltstak利用环境高级状态来自动化操作的入口文件 
+
+				base: ----------------------------------------------- 指定saltstack环境
+				  'wangwwei02': ------------------------------------- 指定目标主机
+				    - init.init ------------------------------------- 指定此目标主机在base环境下执行base环境中init任务目录下的init.sls文件里的内容
+				lnmp: ----------------------------------------------- lnmp环境
+				  'wangwei02': -------------------------------------- 目标主机
+				    - lnmp.install  --------------------------------- lnmp环境下lnmp任务目录下的install.sls任务文件内容执行任务
+				
+
+				root@wanagwei01:/home/salt_env/lnmp/modules/nginx# cat install.sls --------------------nginx安装任务文件
+
+				include: ---------------------------------------------------- include目录方法可以将其他任务包含进此任务文件中 当执行此文件时候会先执行被包含的任务
+				  - modules.pkg.make ----------------------------------------  当前环境目录下（lnmp环境下）modules目录下pkg目录下的make.sls 任务文件
+				  - modules.user.www
+				  - modules.pcre.install-------------------------------------  当前环境目录下（lnmp环境下）modules目录下pcre目录下的install.sls 任务文件
+				  - modules.jemalloc.install
+				  - modules.nginxup.install
+				  
+				nginx-source-install: --------------------------------------   声明任务名称作为任务id使用
+				  file.managed: --------------------------------------------   在此用到的是salt的file文件操作模块的managed方法
+				    - name: /usr/local/src/nginx-1.12.1.tar.gz -------------   指定目标文件的绝对路径 此项会从源文件远程拷贝到目标主机
+				    - source: salt://modules/nginx/files/nginx-1.12.1.tar.gz ----- 源文件路径 其中salt:// 这个方式代表的是当前环境的绝对路径 此路径后面是文件的相对路径
+				    - user: root
+				    - group: root -----------------------------------此三项为文件状态 文件的属组 属主 权限
+				    - mode: 755
+				  cmd.run: ------------------------------------------ saltstack的cmd.run 模块方法用来执行shell命令
+				    - name: cd /usr/local/src/ && tar xf nginx-1.12.1.tar.gz && cd nginx-1.12.1 && ./configure --prefix=/usr/local/nginx --user=www --group=www --with-http_stub_status_module --with-http_v2_module --with-http_ssl_module --with-http_gzip_static_module --with-http_realip_module --with-http_flv_module --with-http_mp4_module  --with-pcre=/usr/local/src/pcre-8.41 --with-pcre-jit --with-ld-opt='-ljemalloc' --add-module=/usr/local/nginx-upload-progress-module-master && make && make install 
+				    - unless: test -d /usr/local/nginx       --------------- salt的unless使用方法 对比ansible有个好处 可以在任务执行前先行执行判断 防止任务的重复执行
+				    - require: ----------------------------------- require方法定义此任务在执行前需要的前置任务 当前置任务执行后并没有错误的前提下 这个任务才会去执行
+				      - user: www-user-group  -------------------- user 为任务对应调用的方法 
+				      - file: nginx-source-install --------------- file 为任务对应的file方法
+				      - pkg: make-pkg ---------------------------- pkg 为pkg方法
+				
+
+				
+				root@wanagwei01:/home/salt_env/lnmp/modules/nginx# cat service.sls ---------------------- nginx的服务任务
+				include:                               ------------------------ 定义执行前的前置任务为 nginx安装任务
+				  - modules.nginx.install
+				
+				nginx-init: ----------------------------------------- 声明任务名称
+				  file.managed: ------------------------------------- 文件管理操作方法
+				    - name: /etc/init.d/nginx ----------------------- 目标主机目标路径
+				    - source: salt://modules/nginx/files/nginx-init ------------------- 在此用到了作为模板的nginx-init文件
+				    - mode: 755
+				    - user: root
+				    - group: root
+
+				  cmd.run: -----------------------------------------  此任务使用的cmd.run执行shell命令
+				    - name: chkconfig --add nginx  -----------------  激活启动脚本
+				    - unless: chkconfig --list | grep nginx --------  unless 在此脚本已经激活的情况下不操作此模块
+				    - require: -------------------------------------  此任务依赖于 nginx-init任务的执行结果
+				      - file: nginx-init
+
+				nginx-log: 
+				  cmd.run:
+				    - name: mkdir -p /data/wwwlogs
+				    - unless: test -d /data/wwwlogs
+				
+				/usr/local/nginx/conf/nginx.conf: ------------------ 此声明方式不同 直接以路径命名 可直接作为目标路径
+				  file.managed:
+				    - source: salt://modules/nginx/files/nginx.conf
+				    - user: www
+				    - group: www
+				    - mode: 644 
+				
+				nginx: --------------------------------------------- 尽量用服务的名字
+				  service.running: --------------------------------- salt的service服务管理模块
+				    - name: nginx ---------------------------------- 服务名称
+				    - enable: True --------------------------------- enbale的意思是此服务应该是开启状态、如果服务为开启 此任务会开启nginx任务
+				    - reload: True --------------------------------- reload的意思是此服务可以重启操作
+				    - require: ------------------------------------- 依赖前置的nginx-init任务
+				      - cmd: nginx-init ---------------------------- 依赖 nginx-init任务的cmd模块任务
+				    - watch: ----------------------watch的使用很重要 此模块会根据监控的文件的配置变更对比 来执行任务后执行 触发 reload：True 重启服务是新配置生效。
+				      - file: /usr/local/nginx/conf/nginx.conf
+				      - file: nginx-online
+				
+				nginx-online:
+				  file.directory: ----------------------------------- file模块的directory方法 用来创建目录
+				    - name: /usr/local/nginx/conf/vhost_online
+				
+				nginx-offline:
+				  file.directory:
+				    - name: /usr/local/nginx/conf/vhost_offline
+
+
+## 自动化运维部署思路 ##
+
+			ansible和saltsta这两种自动化运维工具是当下运维使用的最多和最好的运维自动化运维工具、可以对对服务器集群做集中管理、远程执行、自动化部署、配置更新，
+		资产管理、资产数据获取等功能 上面举的自动部署nginx和php环境只是其一。
+			
+			对于我们公司现阶段使用这两种工具来实现自动化的功能可以用如下流程：
+			
+			1. 新购服务器 主机名命令按一定规则 主机名中体现集群区域、业务、主机id、主机ip后缀 此命令简单明了的表明主机只管信息
+			
+			2. 加入ansible的hosts ssh免秘钥组或者安装saltstack-minion端通过salt-key -A 秘钥认证加入salt管理
+			
+			3. 部署机远程使用ansible或saltstack 执行服务器初始化，包括软件源添加，客户端minion，agent安装，监控客户端安装及安装完自动加入监控集群，系统更新，内核调优，防护墙设置、java、go、python和其他依赖包扩展包等零碎的工作。
+	
+			4. 部署机远程使用ansible或saltstack 执行环境部署，如：lnmp环境，tomcat环境等。
+	
+			5. 部署管理机远程使用ansible或saltstack对集群主机进行 单独任务执行，分组执行，分百分比执行，根据自定义的角色作为目标选择进行分组,单独，按百分比等去执行任务，如：重启操作，文件修改操作，配置更新操作，集群的添加节点，移出节点操作等等。
+			
+			6. ansible和saltstack都可以获取集群各个主机的详细信息，包括cpu，内存，网络，系统，内核版本，主机名，网卡mac地址，磁盘等。利用这些信息对于资产管理很有用，同时这些信息可以拿来作为一些目标选择匹配，利用jinjia模板来做变量赋值等
+		

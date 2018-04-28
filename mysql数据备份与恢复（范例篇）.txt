@@ -1,0 +1,449 @@
+数据备份与恢复
+备份方式： 
+    物理备份：直接拷贝备份库和表对应的文件 
+        cp -r /var/lib/mysql/mysql  /mysql.bak
+        tar -zcvf /mysql.tar.gz  /varlib/mysql/mysql/*
+    逻辑备份：执行备份时，根据已有的库和表生成对应的sql命令,把生成的sql命令存储到指定的备份文件里
+
+备份策略：
+    完全备份： 备份所有数据(表，库，服务器)
+    差异备份：备份自完全备份后所新产生（备份新产生的数据）
+    增量备份：备份自上一次备份后，所有新产生（备份新产生的数据）
+
+备份数据时要考虑的问题
+备份频率 备份时间 备份策略 存储空间 备份文件的命名 xx.sql
+
+备份策略使用方式
+    完全 + 增量
+    完全 + 差异
+
+执行数据备份的方式：周期性计划任务crond 执行备份脚本
+ 
+完全备份数据mysqldump
+    mysqldump -uroot -pabc123 库名 > 目录/名.sql
+    
+    库名的表示方式
+    --all-database         #备份数据库服务器的所有数据
+    库名                         #备份一个库里的所有数据
+    库    表                    #备份一个表里的所有数据( 库和表用空格间隔 )
+    -B 库名1 库名2      #一起备份多各库里的所有数据
+    
+    [root@mysql4-1 admin]# mkdir /bakdir
+    [root@mysql4-1 admin]# mysqldump -uroot -pabc123 mysql > /bakdir/mysql.sql
+    mysqldump: [Warning] Using a password on the command line interface can be insecure.
+    
+    mysql> create database test;
+    [root@mysql4-1 admin]# mysql -uroot -pabc123 test  < /bakdir/mysql.sql 
+    mysql: [Warning] Using a password on the command line interface can be insecure.
+    
+
+增量备份与增量恢复
+一，启用binlog日志 实现实时增量备份
+ binlog日志介绍：又被称为二进制日志 是mysql数据库服务日志文件的一种，记录连接服务器后，执行的除查询之外的sql命令
+查看的：show desc select 
+写的：insert update delete
+启用binlog日志
+vim /etc/my.cnf
+[mysqld]
+server_id=1#5.7之前的版本不需要使用 值1-255
+log-bin
+#systemctl restart mysqld
+
+默认存储路径 /var/lib/mysql
+默认文件名 主机名-bin.000001 > 500M 时会自动在生成
+   主机名-bin.000002
+日志索引文件 主机名-bin.index记录当前已有的binlog日志文件名
+[root@mysql4-1 ~]# cd /var/lib/mysql
+[root@mysql4-1 mysql]# cat mysql4-1-bin.index 
+./mysql4-1-bin.000001
+自定义 binlog日志
+#mkdir /logdir
+#chown mysql /logdir
+#vim /etc/my.cnf
+server_id=1
+log-bin=目录名/日志文件名
+max_binlog_size=数字m超过 数子m 大小时自动生成下一各日志文件
+binlog_format="mixed"
+
+[root@mysql4-1 ~]# vim /etc/my.cnf
+[mysqld]
+server_id=1
+log-bin=/logdir/test
+binlog_format="mixed"
+
+#systemctl restart mysqld
+查看日志当前记录格式
+mysql> show variables like 'binlog_format';
++--------------------------+------------+
+| Variable_name      | Value     |
++--------------------------+-----------+
+| binlog_format         | ROW     |
++--------------------------+------------+
+有三种记录格式：
+statement: 每条修改数据的sql命令都会记录在binlog日志中
+row:不记录sql语句上下文相关信息，仅保存那条记录被修改
+mixed:是以上两种格式混合使用
+ 
+
+ 查看binlog日志内容
+    mysqlbinlog binlog日志文件名
+内容中/* */ 为注释内容
+5.7 之前直接sql写直接记sql
+
+进入数据库
+mysql> insert into studb.user(name,gid,uid) values('li',123,456);
+mysql> insert into studb.user(name,gid,uid) values('bob',23,56);
+mysql> insert into studb.user(name,gid,uid) values('ail',5023,5056);
+
+[root@mysql4-1 mysql]# mysqlbinlog /logdir/test.000001 | grep -i insert
+SET INSERT_ID=48/*!*/;
+insert into studb.user(name,gid,uid) values('li',123,456)
+SET INSERT_ID=49/*!*/;
+insert into studb.user(name,gid,uid) values('bob',23,56)
+SET INSERT_ID=50/*!*/;
+insert into studb.user(name,gid,uid) values('ail',5023,5056)
+
+
+ binlog日志文件记录sql命令的方式：
+时间点
+pos点（偏移量）
+# at 4从偏移量量4 到 123 时间 2017-12-25 20:59:39
+#171225 20:59:39 server id 1  end_log_pos 123 
+执行binlog里记录的sql命令恢复数据
+mysqlbinlog  选项 binlog日志文件名 |  mysql -uroot -pabc123 
+选项 
+时间点  --start-datetime="yyyy/mm/dd hh:mm:ss" 
+--stop-datetime="yyyy/mm/dd hh:mm:ss"#不声明结束时间 默认读到日志结束
+偏移量pos点
+--start-positon=数字
+--stop-positon=数字
+
+什么情况下会生成新的binlog日志文件 （默认>500M后自动创建新的）
+#systemctl restart mysqld
+mysql>flush logs;
+#mysql -uroot -pabc123 -e "flush logs"
+#mysqldump -uroot -pabc123 --flush-logs 表名 > 备份文件.sql
+
+[root@mysql4-1 ~]# mysqldump -uroot -pabc123 --flush-logs mysql > /root/mysql.sql
+
+mysql> show master status;
++----------------------+-------------------+------------------------+-------------------------------+----------------------------------+
+| File                      | Position         | Binlog_Do_DB    | Binlog_Ignore_DB      | Executed_Gtid_Set        |
++----------------------+-------------------+------------------------+-------------------------------+----------------------------------+
+| test.000002        |      154            |                               |                                        |                                            |
++----------------------+-------------------+------------------------+-------------------------------+----------------------------------+
+1 row in set (0.00 sec)
+
+mysql> create database db1;
+mysql> create table db1.t1(id int);
+mysql> insert into db1.t1 values(100);
+mysql> insert into db1.t1 values(101);
+mysql> insert into db1.t1 values(102);
+mysql> flush logs;
+mysql> show master status;
++----------------------+-------------------+------------------------+-------------------------------+----------------------------------+
+| File                      | Position          | Binlog_Do_DB   | Binlog_Ignore_DB      | Executed_Gtid_Set        |
++----------------------+-------------------+------------------------+-------------------------------+----------------------------------+
+| test.000003        |      154            |                               |                                        |                                            |
++----------------------+-------------------+------------------------+-------------------------------+----------------------------------+
+1 row in set (0.00 sec)
+[root@mysql4-1 ~]# mysql -uroot -pabc123 -e "flush logs"
+[root@mysql4-1 ~]# cat /logdir/test.index 
+/logdir/test.000001
+/logdir/test.000002
+/logdir/test.000003
+/logdir/test.000004
+
+删除binlog日志文件方法
+#rm -rf 日志文件    #这样删除不会同步索引文件 不建议用
+mysql>reset master;#删除当前所有日志文件 重新生成一各日志文件 
+purge master logs to "日志文件名"#删除从最开始到当前日志文件名的文件
+
+mysql> purge master logs to 'test.000003';
+[root@mysql4-1 ~]# cat /logdir/test.index 
+/logdir/test.000003
+/logdir/test.000004
+mysql> reset master;
+[root@mysql4-1 ~]# cat /logdir/test.index 
+/logdir/test.000001
+
+练习增量备份并恢复
+1) 完全备份一个数据库
+[root@mysql4-1 ~]# mysqldump -uroot -pabc123 student > /bakdir/stu.sql
+2) 插入三条记录
+mysql> insert into student.users(name,UID,GID) values('test01',1,1);
+mysql> insert into student.users(name,UID,GID) values('test02',2,2);
+mysql> insert into student.users(name,UID,GID) values('test03',3,3);
+mysql> select count(*) from student.users;
++------------------+
+| count(*)         |
++------------------+
+|       47            |
++-----------------+
+3) 删除所以内容
+mysql> delete from student.users;
+Query OK, 47 rows affected (0.06 sec)
+
+4)进行恢复
+先使用完全备份恢复
+[root@mysql4-1 ~]# mysql -uroot -pabc123 student < /bakdir/stu.sql 
+在使用binlog 做增量恢复
+[root@mysql4-1 ~]#  mysqlbinlog /logdir/test.000001 | grep -i -n delete
+174:delete from student.users
+查找其偏移量在1780-2765之间
+[root@mysql4-1 ~]# mysqlbinlog --start-position=1780 --stop-position=2765 /logdir/test.000001 | mysql -uroot -pabc123
+mysql> select count(*) from student.users;
++------------------+
+| count(*)         |
++-----------------+
+|       47           |
++-----------------+
+1 row in set (0.00 sec)
+mysql> select * from student.users where name like "test%";
++-------+-------------+------------------+----------+----------+-------------------+-----------+-------------------+
+| id       | name      | password      | UID     | GID      | describes       | home    | shell               |
++-------+-------------+------------------+----------+----------+-------------------+-----------+-------------------+
+| 45       | test01    | NULL             |    1       |    1        | NULL             | NULL   | /bin/bash         |
+| 46      | test02     | NULL             |    2       |    2        | NULL             | NULL   | /bin/bash         |
+| 47      | test03     | NULL             |    3       |    3        | NULL             | NULL   | /bin/bash         |
++-------+-------------+------------------+----------+----------+-------------------+-----------+-------------------+
+3 rows in set (0.00 sec)
+
+二，使用第三方软件提供的命令做增量备份
+percona 
+ 安装软件包
+     yum -y install perl-DBD-mysql
+     yum -y install perl-Digest-MD5
+     rpm -ivh libev-4.15-1.el6.rf.x86_64.rpm 
+     rpm -ivh percona-xtrabackup-24-2.4.7-1.el7.x86_64.rpm 
+
+ 命令格式
+#innobackupex <选项>
+--use用户名
+--password密码
+--database备份数据库名
+--no-timestamp不用日期命名备份文件存储的子目录
+--apply-log恢复日志  重做已提交的事务，回滚未提交的事务
+--copy-back恢复备份至数据库服务器的数据目录
+
+备份文件夹必须为空
+要求 /var/lib/mysql/ 为空
+xtrabackup只能备份innodb和xtradb两种引擎的表，而不能备份myisam引擎的表；
+innobackupex是一个封装了xtrabackup的Perl脚本，支持同时备份innodb和myisam，但在对myisam备份时需要加一个全局的读锁。还有就是myisam不支持增量备份。
+
+支持事务 和 事务回滚
+ls /var/lib/mysql
+事务日志文件
+ibdata1
+
+LSN 日志序列号
+ib_logfile0 记录sql命令
+ib_logfile1
+
+备份过程
+start xtrabackup_log
+copy .ibd;ibdata1
+FLUSH TABLES WITH READ LOCK
+copy .FRM;MYD;MYI;misc files
+Get binary log position
+UNLOCK TABLES
+stop and copy xtrabackup_log
+备份开始时首先会开启一个后台检测进程，实时检测mysql redo的变化，一旦发现redo中有新的日志写入，立刻将日志记入后台日志文件xtrabackup_log中。之后复制innodb的数据文件和系统表空间文件ibdata1，待复制结束后，执行flush tables with read lock操作，复制.frm，MYI，MYD，等文件（执行flush tableswith read lock的目的是为了防止数据表发生DDL操作，并且在这一时刻获得binlog的位置）最后会发出unlock tables，把表设置为可读可写状态，最终停止xtrabackup_log
+
+
+完全备份
+#innobackupex --user root --password abc123 --database="系统库列表 存储数据库"  备份路径名
+[root@mysql4-1 ~]# innobackupex --user root --password abc123 --databases="performance_schema mysql sys db1" /allbak
+[root@mysql4-1 ~]# ls /allbak/2017-12-26_01-35-30/
+[root@mysql4-1 ~]# rm -rf /allbak/
+[root@mysql4-1 ~]# innobackupex --user root --password abc123 --databases="performance_schema mysql sys db1" /allbak --no-timestamp
+[root@mysql4-1 ~]# ls /allbak/
+
+innobackupex还会在备份目录中创建如下文件
+[root@mysql4-1 allbak]# cat xtrabackup_checkpoints#备份配置文件 
+backup_type = full-backuped#备份类型 （完全或增量）
+from_lsn = 0
+to_lsn = 5379257#LSN 日志序列号 范围信息
+last_lsn = 5379266
+compact = 0
+recover_binlog_info = 0
+
+xtrabackup_logfile    #后台日志文件
+xtrabackup_binlog_info #mysql服务器当前正在使用的二进制日志文件及至备份这一刻为止二进制日志事件的位置。
+ibdata1#系统表空间文件
+xtrabackup_info#有关此次备份的各种详细信息
+backup-my.cnf  #执行备份占用的系统资源
+
+恢复
+先恢复日志 在恢复数据
+首先要保证 /var/lib/mysql 为空
+[root@mysql4-1 allbak]# rm -rf /var/lib/mysql/*
+[root@mysql4-1 allbak]# innobackupex --user root --password abc123 --databases="performance_schema mysql sys db1" --apply-log  /allbak 
+[root@mysql4-1 allbak]# innobackupex --user root --password abc123 --databases="performance_schema mysql sys db1" --copy-back  /allbak 
+[root@mysql4-1 allbak]# chown -R mysql:mysql /var/lib/mysql
+[root@mysql4-1 allbak]# systemctl restart mysqld
+
+[root@mysql4-1 allbak]# cat xtrabackup_checkpoints 
+backup_type = full-prepared#恢复过数据了
+from_lsn = 0
+to_lsn = 5379257
+last_lsn = 5379266
+compact = 0
+recover_binlog_info = 0
+
+
+增量备份
+--incremental 目录名  增量备份
+--incremental-basedir=目录名  增量备份是 指定上一次数据存储的目录名
+#innobackupex --user root --password abc123 --databases="系统库列表 存储数据库" --incremental 目录名 --incremental-basedir=目录名  --no-timestamp
+先有一次完全备份
+[root@mysql4-1 ~]# rm -rf /allbak/
+[root@mysql4-1 ~]# innobackupex --user root --password abc123 --databases="performance_schema mysql sys db1" /allbak --no-timestamp
+
+在数据库中添加一些数据
+增量备份 /new1
+[root@mysql4-1 ~]# innobackupex --user root --password abc123 --databases="performance_schema mysql sys db1" --incremental /new1  --incremental-basedir=/allbak  --no-timestamp
+[root@mysql4-1 ~]# cat /new1/xtrabackup_checkpoints 
+backup_type = incremental
+from_lsn = 5379681
+to_lsn = 5386256
+last_lsn = 5386265
+compact = 0
+recover_binlog_info = 0
+
+在数据库中添加一些数据
+增量备份 /new2
+[root@mysql4-1 ~]# innobackupex --user root --password abc123 --databases="performance_schema mysql sys db1" --incremental /new2  --incremental-basedir=/new1  --no-timestamp
+[root@mysql4-1 ~]# cat /new2/xtrabackup_checkpoints 
+backup_type = incremental
+from_lsn = 5386256
+to_lsn = 5394126
+last_lsn = 5394135
+compact = 0
+recover_binlog_info = 0
+
+
+增量恢复
+
+--incremental-dir=目录名 
+--redo-only 合并日志
+1 恢复日志文件
+先恢复完全备份
+innobackupex --user root --password abc123 --databases="performance_schema mysql sys db1" --apply-log --redo-only /allbak 
+innobackupex --user root --password abc123 --databases="performance_schema mysql sys db1" --apply-log --redo-only /allbak --incremental-dir=/new1 
+innobackupex --user root --password abc123 --databases="performance_schema mysql sys db1" --apply-log --redo-only /allbak --incremental-dir=/new2 
+2 恢复数据
+innobackupex --user root --password abc123 --databases="performance_schema mysql sys db1" --copy-back  /allbak 
+3 重启服务
+
+具体操作
+[root@mysql4-1 ~]# rm -rf /var/lib/mysql/*
+[root@mysql4-1 ~]# cat /allbak/xtrabackup_checkpoints 
+backup_type = full-backuped
+from_lsn = 0
+to_lsn = 5379681
+last_lsn = 5379690
+compact = 0
+recover_binlog_info = 0
+
+[root@mysql4-1 ~]# innobackupex --user root --password abc123 --databases="performance_schema mysql sys db1" --apply-log  --redo-only /allbak 
+[root@mysql4-1 ~]# cat /allbak/xtrabackup_checkpoints
+backup_type = log-applied
+from_lsn = 0
+to_lsn = 5379681
+last_lsn = 5379690
+compact = 0
+recover_binlog_info = 0
+[root@mysql4-1 ~]# cat /new1/xtrabackup_checkpoints 
+backup_type = incremental
+from_lsn = 5379681
+to_lsn = 5386256
+last_lsn = 5386265
+compact = 0
+recover_binlog_info = 0
+
+[root@mysql4-1 ~]# innobackupex --user root --password abc123 --databases="performance_schema mysql sys db1" --apply-log --redo-only /allbak --incremental-dir=/new1
+[root@mysql4-1 ~]# cat /allbak/xtrabackup_checkpoints 
+backup_type = log-applied
+from_lsn = 0
+to_lsn = 5386256
+last_lsn = 5386265
+compact = 0
+recover_binlog_info = 0
+
+[root@mysql4-1 ~]# cat /new2/xtrabackup_checkpoints 
+backup_type = incremental
+from_lsn = 5386256
+to_lsn = 5394126
+last_lsn = 5394135
+compact = 0
+recover_binlog_info = 0
+
+[root@mysql4-1 ~]# innobackupex --user root --password abc123 --databases="performance_schema mysql sys db1" --apply-log --redo-only /allbak --incremental-dir=/new2 
+[root@mysql4-1 ~]# cat /allbak/xtrabackup_checkpoints 
+backup_type = log-applied
+from_lsn = 0
+to_lsn = 5394126
+last_lsn = 5394135
+compact = 0
+recover_binlog_info = 0
+
+[root@mysql4-1 ~]# innobackupex --user root --password abc123 --databases="performance_schema mysql sys db1" --copy-back  /allbak 
+
+[root@mysql4-1 ~]# ls /var/lib/mysql
+db1             ib_logfile0  mysql               xtrabackup_binlog_pos_innodb
+ib_buffer_pool  ib_logfile1  performance_schema  xtrabackup_info
+ibdata1         ibtmp1       sys
+[root@mysql4-1 ~]# chown -R mysql:mysql /var/lib/mysql
+[root@mysql4-1 ~]# systemctl restart mysqld
+[root@mysql4-1 ~]# mysql -uroot -pabc123
+
+new1 和 new2 下的信息已经记录到allbak下了
+[root@mysql4-1 ~]# rm -rf /new1
+[root@mysql4-1 ~]# rm -rf /new2
+
+在数据库中添加一些数据
+
+[root@mysql4-1 ~]# cat /allbak/xtrabackup_checkpoints 
+backup_type = log-applied
+from_lsn = 0
+to_lsn = 5394126
+last_lsn = 5394135
+compact = 0
+recover_binlog_info = 0
+
+在执行增量备份 new1
+[root@mysql4-1 ~]# innobackupex --user root --password abc123 --databases="performance_schema mysql sys db1" --incremental /new1  --incremental-basedir=/allbak  --no-timestamp
+
+[root@mysql4-1 ~]# cat /new1/xtrabackup_checkpoints 
+backup_type = incremental
+from_lsn = 5394126
+to_lsn = 5386173
+last_lsn = 5386182
+compact = 0
+recover_binlog_info = 0
+
+
+使用完全备份文件恢复单个表----innobackupex
+--apply-log    --export  导出表信息     .exp  .cfg
+discard  tablespace  删除表空间          .ibd
+import  tablespace 导入表空间
+
+完全备份
+innobackupex --user root --password abc123 --databases="performance_schema mysql sys gamedb" /gamedbbak --no-timestamp
+模拟数据丢失
+drop table t1;
+1.按照原表结构创建表
+create table t1(id int);
+2.从配置文件里导出表信息
+innobackupex --user root --password abc123 --databases="performance_schema mysql sys gamedb" --apply-log --export  /gamedbbak
+3.删除表空间
+alter table t1 discard tablespace; 
+4.把导出的表信息 拷贝的对应的数据库目录下
+ti.ibd t1.exp t1.cfg
+cd /gamedbbak/gamedb
+cp t1.{exp,ibd,cfg} /var/lib/mysql/gamedb/
+ls /var/lib/mysql/gamedb/t1.*
+5.导入表空间
+chown mysql:mysql t1.*
+alter table t1 import tablespace;

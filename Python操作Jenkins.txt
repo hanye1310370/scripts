@@ -1,0 +1,42 @@
+Python操作Jenkins
+原创 2017年04月13日 16:58:46 1478
+Jenkins remote access API
+ https://wiki.jenkins-ci.org/display/JENKINS/Remote+access+API
+如果通过python来操作控制Jenkins， 有两个module可以使用，JenkinsAPI  和 Python-Jenkins。
+JenkinsAPI： https://pypi.python.org/pypi/jenkinsapi
+Python-Jenkins: https://pypi.python.org/pypi/python-jenkins/
+Python-Jenkins在线文档：http://python-jenkins.readthedocs.io/en/latest/api.html
+实例如下：
+[python] view plain copy
+import jenkins  
+import time  
+import sys  
+  
+  
+def run():  
+    server = jenkins.Jenkins(url=url, username=user, password=pwd)  
+    server.build_job(name=jobName, token=jobToken)  
+    while True:  
+        time.sleep(1)  
+        print 'check running job...'  
+        if len(server.get_running_builds()) == 0:  
+            break  
+        else:  
+            time.sleep(20)  
+    last_build_number = server.get_job_info(jobName)['lastCompletedBuild']['number']  
+    build_info = server.get_build_info(jobName, last_build_number)  
+    build_result = build_info['result']  
+    print 'Build result is ' + build_result  
+    if build_result == 'SUCCESS':  
+        sys.exit(0)  
+    else:  
+        sys.exit(-1)  
+  
+  
+if __name__ == '__main__':  
+    run()  
+
+说明：
+1. 建立Jenkins链接
+2. 远程触发Jenkins上面的一个job
+3. 检测job是否build完成，如果完成，则检查build结果

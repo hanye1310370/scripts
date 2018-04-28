@@ -1,0 +1,330 @@
+背景
+
+公司现在要对所有的重要服务进行双机，高可用，或者冷备份等等。当前有台很重要的业务数据存储在本地是一件很不安全的做法。在一次升级讨论中，领导提出要进行升级改造，将业务数据存放在单独的文件服务器，因为有些业务机器运行在windows中，Unix&&Windows 平台共享方案--Samba首当其冲了。
+那么Samba如何实现双机以及数据同步呢？答案不止一种了。
+经过研究，发现这种方案对于当前的业务场景非常贴近：
+Heartbeat+Samba实现双机热备
+实现samba的双机集群，当smbsvr1宕机后，smbsvr2能及时的提供服务；当smbsvr1恢复正常后，smbsvr2退出作为备用机
+
+Rsync+Inotify-tools实现数据的实时同步
+保证文件的一致性。
+在文章之前，大家最好能够看下heartbeat的基础内容，大神请绕过。
+http://blog.51cto.com/ljohn/2047150
+环境准备
+
+拓扑：
+
+
+VIP:172.16.3.110
+
+smbsvr1:
+eth0:172.16.3.89
+smbsvr2:
+eth0:172.16.3.90
+
+##注意：
+    配置集群的前提：
+        (1) 时间同步；
+        (2) 基于当前正在使用的主机名互相访问；
+        (3) 是否会用到仲裁设备；
+程序	版本
+samba	3.6.23
+heartbeat	3.0.4
+rsync	3.0.6
+inotify-tools	3.14
+安装配置
+
+一：heartbeat+samba安装配置
+
+1、smbsvr1
+
+# yum -y install samba heartbeat
+# cp /usr/share/doc/heartbeat-3.0.4/{ha.cf,authkeys,haresources} /etc/ha.d/
+# cd /etc/ha.d/
+
+配置ha.cf
+# grep -E -v '^#|^$' /etc/ha.d/ha.cf 
+debugfile /var/log/ha-debug
+logfile    /var/log/ha-log
+logfacility    local0
+keepalive 2
+deadtime 30
+warntime 10
+initdead 120
+udpport    694
+ucast eth0 172.16.3.90
+auto_failback on
+node    smbsvr1
+node    smbsvr2
+ping 172.16.3.254
+respawn hacluster /usr/lib64/heartbeat/ipfail
+
+
+配置authkeys
+# grep -E -v '^#|^$' /etc/ha.d/authkeys 
+auth 3
+3 md5 Hello!
+
+##去掉这两行前的#号
+
+配置haresources
+# grep -E -v '^#|^$' /etc/ha.d/haresources 
+smbsvr1 172.16.3.110/24/eth0:0 smb
+
+##文件末尾添加此行
+
+配置samba
+# mkdir -pv /szt    #创建共享文件夹
+# vim /etc/samba/smb.conf  
+修改security = share
+在末行加入以下内容：
+[szt]
+comment = share all
+path = /szt
+browseable = yes
+public = yes
+writeable = yes
+guest ok = yes
+2、smbsvr2
+
+配置参照“1、smbsvr1”
+除了ha.cf配置有变化(ucast eth0 172.16.3.89 IP地址为对方节点的)，其余都步骤均保持一样
+# grep -E -v '^#|^$' /etc/ha.d/ha.cf
+debugfile /var/log/ha-debug
+logfile    /var/log/ha-log
+logfacility    local0
+keepalive 2
+deadtime 30
+warntime 10
+initdead 120
+udpport    694
+ucast eth0 172.16.3.89
+auto_failback on
+node    smbsvr1
+node    smbsvr2
+ping 172.16.3.254
+respawn hacluster /usr/lib64/heartbeat/ipfail
+3、启动测试
+
+两台机器分别heartbeat
+# service heartbeat start
+# 查看smbsvr1 ip地址
+# ifconfig 
+eth0      Link encap:Ethernet  HWaddr 00:50:56:8C:14:95  
+          inet addr:172.16.3.89  Bcast:172.16.3.255  Mask:255.255.255.0
+          inet6 addr: fd22:455a:117:0:250:56ff:fe8c:1495/64 Scope:Global
+          inet6 addr: fe80::250:56ff:fe8c:1495/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:1057 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:469 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:128877 (125.8 KiB)  TX bytes:79903 (78.0 KiB)
+
+eth0:0    Link encap:Ethernet  HWaddr 00:50:56:8C:14:95  
+          inet addr:172.16.3.110  Bcast:172.16.3.255  Mask:255.255.255.0
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+# service smb status
+smbd (pid  1701) is running...
+如此以来就实现了heartbeat+samba双机热备，是不是很简单呢，当然还存在一些问题，数据如何保持一致？如果smb服务关闭，heartbeat会不会产生脑裂呢？
+二、rsync+inotify-tools双向数据实时同步配置
+
+数据同步也可参照笔者的另一篇文章：
+http://blog.51cto.com/ljohn/2047156
+这篇文章仅仅实现了单向的文件同步，双向同步要按照步骤反过来再次部署一次。
+smbsvr1与smbsvr2 两个节点的配置基本保持一致，这里仅提供相关服务的配置过程，其他不再赘述。
+
+# yum -y install rsync xinetd inotify-tools 
+# cp /etc/xinetd.d/rsync{,.bak}
+
+#配置sync
+# sed -i -e 's/= yes/= no/g' /etc/xinetd.d/rsync
+# cat >/etc/rsyncd.conf <<EOF
+logfile = /var/log/rsyncd.log
+pidfile = /var/run/rsyncd.pid
+lockfile = /var/run/rsync.lock
+secretsfile = /etc/rsync.pass
+motdfile = /etc/rsyncd.Motd
+[app_rsync_server]
+path = /szt
+comment = app_rsync_server
+uid = root
+gid = root
+port =873
+use chroot = no
+read only = no
+list = no
+mac connections = 200
+timeout = 600
+auth users = rsync
+hosts allow = 172.16.3.89
+hosts deny = 172.16.3.100,172.16.3.88
+EOF
+#配置rsync同步账号密码
+echo "rsync:123456" >/etc/rsync.pass
+echo "123456" >/etc/passwd.txt
+#赋权限并启动
+# chmod 600 /etc/passwd.txt
+# chmod 600 /etc/rsyncd.conf 
+# chmod 600 /etc/rsync.pass 
+# /etc/init.d/xinetd restart
+#配置inotify-tools
+cat >>/etc/sysctl.conf<<EOF
+# inotify kernel config
+fs.inotify.max_queued_events = 99999999
+fs.inotify.max_user_watches = 99999999
+fs.inotify.max_user_instances = 65535
+#sysctl  -p   参数立即生效
+# cat /proc/sys/fs/inotify/{max_user_instances,max_user_watches,max_queued_events}  #检查参数是否生效
+65535
+99999999
+99999999
+#实时同步脚本
+#smbsvr1中：
+
+# cat /usr/local/inotify/rsync.sh 
+#!/bin/bash
+# author ljohn
+# last uptime  2017.12.1
+
+src_dir="/szt/"
+dst_dir="app_rsync_client"  #目标目录标识
+exclude_dir="/usr/local/inotify/exclude.list"
+rsync_user="rsync"
+rsync_passwd="/etc/passwd.txt"
+dst_ip="172.16.3.90"  #目标IP
+rsync_command(){
+                  rsync -avH --port=873 --progress --delete --exclude-from=$exclude_dir $src_dir $rsync_user@$ip::$dst_dir --password-file=$rsync_passwd
+}
+for ip in $dst_ip;do
+     rsync_command
+done
+    /usr/bin/inotifywait -mrq --timefmt '%d/%m/%y %H:%M' --format '%T %w%f%e' -e close_write,modify,delete,create,attrib,move $src_dir \
+| while read file;do
+   for ip in $dst_ip;do
+       rsync_command
+       echo "${file} was rsynced" >> /tmp/rsync.log 2>&1
+   done
+ done
+注意:
+dst_dir="app_rsync_client" #目标目录标识,在smbsvr2为app_rsync_server
+dst_ip="172.16.3.90" #目标IP，在smbsvr2中为172.16.3.89
+添加为开机启动
+# cat >> /etc/rc.d/rc.local <<EOF
+nohup /bin/sh /usr/local/inotify/rsync.sh &
+EOF
+集群验证
+
+一、集群测试
+
+1、关闭主节点heartbeat 服务，是否failover,启动heartbeat 是否failback
+
+[root@smbsvr1 ~]# /etc/init.d/heartbeat stop
+Stopping High-Availability services: Done.
+
+[root@smbsvr2 ~]# ifconfig 
+eth0      Link encap:Ethernet  HWaddr 00:50:56:8C:61:EC  
+          inet addr:172.16.3.90  Bcast:172.16.3.255  Mask:255.255.255.0
+          inet6 addr: fd22:455a:117:0:250:56ff:fe8c:61ec/64 Scope:Global
+          inet6 addr: fe80::250:56ff:fe8c:61ec/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:83388 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:80369 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:5447750 (5.1 MiB)  TX bytes:6242625 (5.9 MiB)
+
+eth0:0    Link encap:Ethernet  HWaddr 00:50:56:8C:61:EC  
+          inet addr:172.16.3.110  Bcast:172.16.3.255  Mask:255.255.255.0
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+[root@smbsvr1 ~]# ip a 
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 16436 qdisc noqueue state UNKNOWN 
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    link/ether 00:50:56:8c:14:95 brd ff:ff:ff:ff:ff:ff
+    inet 172.16.3.89/24 brd 172.16.3.255 scope global eth0
+    inet 172.16.3.110/24 brd 172.16.3.255 scope global secondary eth0:0
+    inet6 fd22:455a:117:0:250:56ff:fe8c:1495/64 scope global dynamic 
+       valid_lft forever preferred_lft forever
+    inet6 fe80::250:56ff:fe8c:1495/64 scope link 
+       valid_lft forever preferred_lft forever
+
+
+[root@smbsvr1 ~]# /etc/init.d/heartbeat start
+Starting High-Availability services: INFO:  Resource is stopped
+Done.
+[root@smbsvr1 ~]# ip a 
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 16436 qdisc noqueue state UNKNOWN 
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    link/ether 00:50:56:8c:14:95 brd ff:ff:ff:ff:ff:ff
+    inet 172.16.3.89/24 brd 172.16.3.255 scope global eth0
+    inet 172.16.3.110/24 brd 172.16.3.255 scope global secondary eth0:0
+    inet6 fd22:455a:117:0:250:56ff:fe8c:1495/64 scope global dynamic 
+       valid_lft forever preferred_lft forever
+    inet6 fe80::250:56ff:fe8c:1495/64 scope link 
+       valid_lft forever preferred_lft forever
+
+[root@smbsvr1 ~]# /etc/init.d/smb status
+smbd (pid  2735) is running...
+2、关闭主节点系统，重启系统，是否failover；启动主节点的系统，是否failback
+
+     重启测试，这里就不演示了，但自己一定要测试。
+
+    注意:
+
+    要被高可用的的服务一定不能开机启动（这里的samba服务）
+    #chkconfig smb off
+二、数据同步测试
+
+1、主节点创建文件
+
+[root@smbsvr1 szt]# touch smbsvr1{1..10}
+[root@smbsvr1 szt]# ls
+smbsvr11  smbsvr110  smbsvr12  smbsvr13  smbsvr14  smbsvr15  smbsvr16  smbsvr17  smbsvr18  smbsvr19
+
+[root@smbsvr2 szt]# ls
+smbsvr11  smbsvr110  smbsvr12  smbsvr13  smbsvr14  smbsvr15  smbsvr16  smbsvr17  smbsvr18  smbsvr19
+2、备用节点创建文件
+
+[root@smbsvr2 szt]# touch smbsvr2{1..10}
+[root@smbsvr2 szt]# ls
+smbsvr11   smbsvr12  smbsvr14  smbsvr16  smbsvr18  smbsvr21   smbsvr22  smbsvr24  smbsvr26  smbsvr28
+smbsvr110  smbsvr13  smbsvr15  smbsvr17  smbsvr19  smbsvr210  smbsvr23  smbsvr25  smbsvr27  smbsvr29
+
+[root@smbsvr1 szt]# ls
+smbsvr11   smbsvr12  smbsvr14  smbsvr16  smbsvr18  smbsvr21   smbsvr22  smbsvr24  smbsvr26  smbsvr28
+smbsvr110  smbsvr13  smbsvr15  smbsvr17  smbsvr19  smbsvr210  smbsvr23  smbsvr25  smbsvr27  smbsvr29
+3、 在客户端创建文件测试
+
+[root@smbsvr1 szt]# ls
+client1.txt.txt  smbsvr12  smbsvr15  smbsvr18  smbsvr210  smbsvr24  smbsvr27
+smbsvr11         smbsvr13  smbsvr16  smbsvr19  smbsvr22   smbsvr25  smbsvr28
+smbsvr110        smbsvr14  smbsvr17  smbsvr21  smbsvr23   smbsvr26  smbsvr29
+
+[root@smbsvr2 szt]# ls
+client1.txt.txt  smbsvr12  smbsvr15  smbsvr18  smbsvr210  smbsvr24  smbsvr27
+smbsvr11         smbsvr13  smbsvr16  smbsvr19  smbsvr22   smbsvr25  smbsvr28
+smbsvr110        smbsvr14  smbsvr17  smbsvr21  smbsvr23   smbsvr26  smbsvr29
+这里要提供一个脚本：在测试时发现，如果有人或者意外关闭了samba服务
+集群不会Failover。
+
+```
+#cat /server/scripts/smb.sh 
+#!/bin/bash
+#it's about to watch smb's status
+while :
+do
+i=`ps aux |grep smbd |grep -v "grep smbd" |wc -l`
+if [ $i = 0 ];then
+     service heartbeat stop && exit 1 
+fi
+done
+
+#在smbsvr1中开机启动（/etc/rc.d/rc.local），或者手动启动。
+```
+至此《heartbeat+rsync+inotify+samba》双机集群 部署完毕！！

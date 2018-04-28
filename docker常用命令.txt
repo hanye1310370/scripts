@@ -1,0 +1,112 @@
+#查看版本
+docker version
+
+#查看信息
+docker info
+复制代码
+【IMAGE 镜像操作】
+
+#查找image
+docker search centos
+
+#pull image
+docker pull image
+
+#查看image
+docker images
+
+#查看image信息
+docker inspect IMAGE ID
+
+#查看image历史
+docker history IMAGE ID
+
+#删除image
+docker rmi IMAGE ID
+复制代码
+ 
+
+复制代码
+【CONTAINER 容器操作】
+
+#查看所有容器
+docker ps -a
+
+#查看容器信息
+docker inspect CONTAINER
+
+#启动容器
+docker run image_name
+
+#启动容器时可添加命令
+docker run image_name echo "hello word"
+
+#交互式启动
+docker run -t -i image_name
+
+#结束后自动删除容器
+docker run -t -i --rm image_name
+
+#做路径和端口映射，前面的端口和路径为操作系统所有，后面的为容器内所有
+docker run --name=apache_8001 -t -i -p 8001:80 -v /root/httpd/httpd_8001:/var/www/html centos_apache
+
+#开始、停止、kill、删除容器
+docker start CONTAINER
+docker restart CONTAINER
+docker stop CONTAINER
+docker kill   CONTAINER
+docker rm   CONTAINER
+
+#attach 容器，退出是自动停止容器
+docker attach CONTAINER
+
+#在容器内执行命令，-t -i 交互模式操作容器，退出时不会关闭容器
+docker exec CONTAINER echo "hello docker"
+docker exec -t -i CONTAINER
+
+#从容器中取日志
+docker logs CONTAINER
+
+#列出容器中改变的文件
+docker diff CONTAINER
+
+#显示容器中进程信息
+docker top CONTAINER
+
+#从容器中拷贝文件
+docker cp CONTAINER:/container_path to_path
+save/load方式
+#通过commit容器生成镜像，save导出镜像，load导入镜像
+docker commit CONTAINER REPOSITORY:TAG
+docker save REPOSITORY:TAG > IMAGE_NAME.tar
+docker load < IMAGE_NAME.tar
+
+docker导入导出
+#export/import方式
+#export的是容器，import的是镜像，import时可以给image起名
+docker export CONTAINER > IMAGE_NAME.tar
+docker import - qxy1:v1.0 < IMAGE_NAME.tar
+
+阿里云docke 加速器：
+[root@centos lnmp]# cat /etc/docker/daemon.json 
+{
+"registry-mirrors": ["https://pf16ukja.mirror.aliyuncs.com"]
+}
+
+
+root@iZ2zeb1kcfbotalsu02k64Z:/home/qa/demo/erp# git branch
+  master
+* release/2.2.4
+
+
+ [root@centos ~]# docker inspect xy_mysql|id
+
+uid=0(root) gid=0(root) groups=0(root),1006(docker)
+
+[root@centos ~]# docker inspect xy_mysql|grep -i IPADDRESS
+
+            "SecondaryIPAddresses": null,
+
+            "IPAddress": "172.17.0.2",
+
+                    "IPAddress": "172.17.0.2",

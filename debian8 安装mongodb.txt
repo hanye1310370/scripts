@@ -1,0 +1,91 @@
+介绍
+MongoDB是一个在现代Web应用程序中常用的免费和开源的NoSQL文档数据库。本教程将帮助您在服务器上设置MongoDB以在生产应用程序环境中使用。您将安装MongoDB并配置防火墙规则以限制对MongoDB的访问。
+先决条件
+要遵循本教程，您需要：
+一个带有sudo非root用户的Debian 8服务器。您可以在使用Debian 8的初始服务器设置指南中设置具有这些权限的用户。
+第1步 - 安装MongoDB
+MongoDB已经包含在Debian的软件包存储库中，但官方MongoDB存储库提供了最新的版本，是推荐的安装软件的方式。在这一步中，我们将把这个官方仓库添加到我们的服务器。 Debian通过验证软件包是否使用GPG密钥进行签名来确保软件包的真实性，因此我们首先必须为官方MongoDB存储库导入它们的密钥。
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 0C49F3730359A14518585931BC711F9BA15703C6
+成功导入密钥后，您将看到：
+输出
+gpg: Total number processed: 1
+gpg:               imported: 1  (RSA: 1)
+接下来，我们必须添加MongoDB存储库详细信息，因此apt将知道从哪里下载软件包。 发出以下命令为MongoDB创建列表文件。
+echo "deb http://repo.mongodb.org/apt/debian jessie/mongodb-org/3.4 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-3.4.list
+添加存储库详细信息后，更新软件包列表：
+sudo apt-get update
+现在使用以下命令安装MongoDB包本身：
+sudo apt-get install -y mongodb-org
+这将安装最新的稳定版本的MongoDB，以及一些对MongoDB服务器有用的管理工具。 一旦MongoDB安装，启动服务，并确保在服务器重新启动时启动：
+sudo systemctl enable mongod.service
+sudo systemctl start mongod
+然后使用systemctl检查服务是否已正常启动：
+sudo systemctl status mongod
+您应该看到以下输出，指示服务正在运行：
+输出
+● mongod.service - High-performance, schema-free document-oriented database
+   Loaded: loaded (/lib/systemd/system/mongod.service; enabled)
+   Active: active (running) since Tue 2017-02-28 19:51:51 UTC; 7s ago
+     Docs: https://docs.mongodb.org/manual
+ Main PID: 8958 (mongod)
+   CGroup: /system.slice/mongod.service
+           └─8958 /usr/bin/mongod --quiet --config /etc/mongod.conf
+
+Feb 28 19:51:51 cart-61037 systemd[1]: Started High-performance, schema-free document-oriented database.
+现在MongoDB已成功安装，让我们用软件防火墙保护它。
+第2步 - 使用防火墙保护MongoDB
+
+ 
+在大多数情况下，MongoDB只应从某些受信任位置访问，例如承载应用程序的另一个服务器。要完成此任务，您可以允许在MongoDB的默认端口上访问，同时指定将被明确允许连接的另一个服务器的IP地址。我们将使用iptables防火墙设置此规则，以及一些其他规则来保护系统。 在我们编写任何规则之前，安装iptables-persistent包，以便保存创建的规则。这样，每次重新启动服务器时，都会应用这些规则。执行此命令：
+sudo apt-get install iptables-persistent
+注意 ：在安装过程中，系统可能会询问您是否要保留任何现有规则。 您可以丢弃现有规则。 接下来，删除可能存在的任何现有规则，以防万一：
+sudo iptables -F
+然后添加允许已建立的连接继续通话的规则。这样我们现有的SSH连接不会中断：
+sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+接下来，确保允许SSH访问：
+sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+如果计划从远程服务器连接到MongoDB，请添加这些规则，这将允许从应用程序服务器访问MongoDB的默认端口：
+sudo iptables -A INPUT -s your_other_server_ip -p tcp --destination-port 27017 -m state --state NEW,ESTABLISHED -j ACCEPT
+sudo iptables -A OUTPUT -d your_other_server_ip -p tcp --source-port 27017 -m state --state ESTABLISHED -j ACCEPT
+接下来，添加允许本地环回设备上的流量的这些规则：
+sudo iptables -A INPUT -i lo -j ACCEPT
+sudo iptables -A OUTPUT -o lo -j ACCEPT
+最后，更改防火墙策略以删除所有其他流量：
+sudo iptables -P INPUT DROP
+警告 ：更改默认策略以删除规则中未明确定义的流量将意味着一切都被锁定。如果您希望以后允许其他流量，则需要添加新规则。 此外，如果您不小心清除了规则，您将被锁定在您的服务器之外。最好使用sudo iptables -P INPUT ACCEPT来允许流量通过，如果你需要在将来调整你的规则。 然后，您可以使用sudo iptables -P INPUT DROP在您确定某些配置正确后将其锁定。 验证规则是否正确：
+sudo iptables -S
+您应该看到类似于以下的输出：
+Output-P INPUT DROP
+-P FORWARD ACCEPT
+-P OUTPUT ACCEPT
+-A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT
+-A INPUT -s your_other_server_ip/32 -p tcp -m tcp --dport 27017 -m state --state NEW,ESTABLISHED -j ACCEPT
+-A INPUT -i lo -j ACCEPT
+-A OUTPUT -d your_other_server_ip/32 -p tcp -m tcp --sport 27017 -m state --state ESTABLISHED -j ACCEPT
+-A OUTPUT -o lo -j ACCEPT
+最后，保存规则：
+netfilter-persistent save
+要了解有关这些防火墙规则的更多信息，请参阅如何在Ubuntu 14.04上使用Iptables设置防火墙 。
+第3步 - 启用对外部服务器的访问（可选）
+默认情况下，当前版本的MongoDB不接受外部连接。如果您通过防火墙限制了对特定IP地址的访问，则可以修改MongoDB的配置以接受远程连接。 编辑MongoDB配置文件：
+sudo nano /etc/mongod.conf
+查找此部分：
+mongod.conf
+# network interfaces
+net:
+  port: 27017
+  bindIp: 127.0.0.1
+Mongo正在监听本地环回地址，因此它只接受本地连接。更改bindIp值，使其包括您的MongoDB服务器的IP地址：
+mongod.conf
+# network interfaces
+net:
+  port: 27017
+  bindIp: 127.0.0.1, your_server_ip
+保存文件并退出编辑器。 然后重新启动MongoDB以应用更改：
+sudo systemctl restart mongod
+您的远程计算机现在应该能够连接。但是，您可能还需要启用身份验证以进一步保护数据库。
+结论
+
+ 
+您可以在这些DigitalOcean社区文章中找到有关MongoDB安装和配置的更深入的说明。 请务必备份您的数据 ，并探索如何加密传输中的数据 。

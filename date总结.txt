@@ -1,0 +1,18 @@
+ date +%Y''%m''%d'-'%H''%M''%S
+
+DATETIME=`date +%Y''%m''%d'-'%H''%M''%S` 
+root@zz-fangxin-erp-master:/data/sh# date +%Y''%m''%d'-'%H''%M''%S
+20180131-102805
+
+root@zz-fangxin-erp-master:/data/sh# date +%Y''%m''%d'_'%H''%M''%S
+20180131_102845
+
+time=$(date +"%Y-%m-%d-%H")
+root@zz-fangxin-erp-master:/data/sh# date +"%Y-%m-%d-%H-%M-%S"
+2018-01-31-10-32-57
+root@zz-fangxin-erp-master:/data/sh# date +"%Y-%m-%d-%H:%M:%S"
+2018-01-31-10:34:20
+root@zz-fangxin-erp-master:/data/sh# date +"%Y%m%d-%H%M%S"
+20180131-103532
+root@zz-fangxin-erp-master:/data/sh# date +"%Y%m%d%H%M%S"
+20180131103544

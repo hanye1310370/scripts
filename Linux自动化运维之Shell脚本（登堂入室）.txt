@@ -1,0 +1,404 @@
+基本正则表达式 （使用一些特殊符号来表达）
+^ 开始
+$ 结尾
+[ ] 集合中任意单个符号
+[^ ] 对集合取反
+. 任意单个符号
+
+匹配前一个字符出现任意次（0次或多次）
+.* 匹配所以
+{n,m} 匹配前一个字符出现了n到m次
+{n,} 匹配前一个字符出现了n次或n次以上
+{n} 匹配前一个字符出现n次
+扩展正则（优化基本，添加新的）
+{n,m}
+{n,}
+{n}
+将*拆成了+ ？
+
+匹配 1 次或多次
+？ 匹配 0 或 1 次
+() 整体
+| 或者
+\b 匹配单词边界
+\B 匹配非单词边界
+\< 匹配指定单词开头
+\> 匹配指定单词结尾
+[root@room1pc32 正则表达式]# grep "test" test.txt 
+this is a test file
+testisgood
+goodtest haha
+[root@room1pc32 正则表达式]# grep "\btest\b" test.txt 
+this is a test file
+[root@room1pc32 正则表达式]# grep "\btest" test.txt 
+this is a test file
+testisgood
+[root@room1pc32 正则表达式]# grep "test\b" test.txt 
+this is a test file
+goodtest haha
+基本正则：兼容性强，书写麻烦
+扩展正则：兼容性差，书写简单
+egrep 可以使用扩展的正则表达式
+grep -E 表示使用扩展的正则表达式
+extended register
+扩充寄存器
+grep [a]{1,4}
+等同于
+grep -E [a]{1,4}
+-c 返回匹配的行数
+-o 显示一行中与指定模式匹配的部分
+grep -Ec 条件 #显示匹配行数
+grep -Eo 条件 | wc -l #显示可得到匹配的实际数目
+
+sed 非交互文本编译器（流处理器）
+sed [选项] '条件指令' 文件
+选项：
+-n 屏蔽sed默认输出
+-r 开启扩展正则
+-i 修改源文件
+条件：
+1.行号
+
+    [root@A ~]# sed -n '1p' /etc/passwd     #打印第一行
+    root:x:0:0:root:/root:/bin/bash 
+    [root@A ~]# sed -n '1,3p' /etc/passwd   #打印 1，2，3 行
+    root:x:0:0:root:/root:/bin/bash
+    bin:x:1:1:bin:/bin:/sbin/nologin
+    daemon:x:2:2:daemon:/sbin:/sbin/nologin
+2.正则表达式
+
+[root@A ~]# sed -nr '/^test:/p' /etc/passwd  #/../之中输入正则 p 为打印
+test:x:3468:3468::/home/test:/bin/bash
+指令:(增 删 改 查)
+p 打印
+d 删除
+s 替换 s/旧/新/
+s # 新 # 旧 # #可变
+注意事项：替换符号可以是任意其他符号
+a append 追加 之后加一行
+i insert 插入 之前加一行
+c 替换行change
+r 导入
+w 另存为 
+H/h 复制
+G/g 粘贴
+
+() 保留，复制
+\ 粘贴
+例：
+
+[root@A ~]# sed 'd' /etc/passwd
+[root@A ~]# sed '/bash$/d' /etc/passwd  #显示删除后的
+
+[root@A ~]# sed  's/2012/666/' a.txt    #默认替换每行的第一个
+666 2011 2012
+2018 666
+2013
+666 2012 2012
+[root@A ~]# sed  's/2012/666/g' a.txt   #替换全部
+666 2011 666
+2018 666
+2013
+666 666 666
+[root@A ~]# sed  's/2012/666/2' a.txt   #替换第二个
+2012 2011 666
+2018 2012
+2013
+2012 666 2012
+[root@A ~]# cat 1.txt 
+98969 9899 9869 98969
+[root@A ~]# sed 's9\98\9\99\96\99' 1.txt
+98969 969 9869 98969
+
+[root@A ~]# vim test.txt
+[root@A ~]# cat test.txt
+ni hao nb
+welcome to beijing
+1.把第一个字符和最后一个字符对调
+[root@A ~]# sed -r 's/^(.)(.*)(.)$/\3\2\1/' test.txt
+bi hao nn
+gelcome to beijinw
+2.把第二个字符和倒数第二个字符对调
+^(.)(.)(.*)(.)(.)$  \1\4\3\2\5
+
+[root@A ~]# sed 'a666 1' test.txt 
+12
+666 1
+[root@A ~]# sed 'i666 1' test.txt 
+666 1
+12
+[root@A ~]# sed 'c666 1' test.txt 
+666 1
+
+[root@A ~]# sed 'r /etc/hosts' a.txt 
+    a.txt的每一行下导入/etc/hosts 的内容
+[root@A ~]# sed '2r /etc/hosts' a.txt 
+    a.txt的第二行下导入/etc/hosts 的内容
+[root@A ~]# sed  -i 'w /b.txt' a.txt        #全文另存为
+[root@A ~]# sed  -i '3w /c.txt' a.txt   #仅第三行另存为
+[root@A ~]# cat /b.txt 
+2012 2011 2012
+2018 2012
+2013
+2012 2012 2012
+[root@A ~]# cat /c.txt
+2013
+[root@A ~]# sed '2H;3G' a.txt 
+2012 2011 2012
+2018 2012
+2013                #G 为追加粘贴 
+
+2018 2012
+2012 2012 2012
+练习：
+1)把/etc/paswd/中能登录的用户找出来
+#!/bin/bash
+sed -n '/bash$/p' /etc/passwd > tmp.txt
+for i in cat tmp.txt
+do
+echo ${i%%:*}
+done
+
+#!/bin/bash
+sed -n '/bash$/s/:.*//p' /etc/passwd
+2)把/etc/shadow中的密码显示
+
+#!/bin/bash
+A=`sed -n '/bash$/s/:.*//p' /etc/passwd` &> /dev/null
+for i in $A 
+do
+    p1=`grep "$i" /etc/shadow`
+    p2=${p1#*:}
+    p3=${p2%%:*}
+    echo "$i:$p3"
+done
+awk 数据过滤，统计（行，列）
+逐行处理器
+awk [选项] '条件{指令}' 文件
+命令 | awk [选项] '条件{指令}'
+
+[root@A ~]# free | awk '/Mem/{print $4}'    #查看内存
+[root@A ~]# ifconfig eth0 | awk '/RX p/{print $5}' #查看网卡流量
+[root@A ~]# tailf /var/log/secure   #监控 远程登录 日志文件
+选项：
+-F 指定分隔符 #默认分隔符为空格和（TAB）
+[root@A ~]# awk -F: '{print $1}' /etc/passwd
+
+awk 内置变量
+$1 $2 $3.. #某一列
+NF #当前行有多少列
+NR #当前行号
+
+[root@A ~]# awk -F: '{print NR}' /etc/passwd
+[root@A ~]# awk -F: '{print NF}' /etc/passwd
+[root@A ~]# awk -F: '{print $NF}' /etc/passwd   #打印最后一列
+[root@A ~]# awk '{print "nh","nb","nm"}' /etc/passwd  #打印常量(必须用双引号)
+[root@A ~]# awk -F: '{print "用户名为：",$1}'  /etc/passwd
+用户名为： root
+用户名为： bin
+...
+awk [选项] 'BEGIN{} 条件{} END{}' 文件
+原则：所有的指令必须放在{}
+BEGIN{}:指令在读取文件内容前执行1次
+条件{}: 指令在读取文件后中执行n次
+END{}: 指令在读取文件后执行1次
+
+[root@A ~]# awk 'BEGIN{print "nihao"}' a.txt
+nihao
+[root@A ~]# awk '{print "nihao"}' a.txt 
+nihao
+nihao
+nihao
+nihao
+[root@A ~]# awk 'END{print "nihao"}' a.txt 
+nihao
+awk 条件：
+1.正则（模糊）
+
+在一整行中包含root即可
+[root@A ~]# grep 'root' /etc/passwd
+root:x:0:0:root:/root:/bin/bash
+operator:x:11:0:operator:/root:/sbin/nologin
+#在一整行包含root即可（模糊查找）
+[root@A ~]# awk -F: '/root/{print $3}' /etc/passwd
+0
+11
+[root@A ~]# awk -F: '/^root/{print $3}' /etc/passwd
+0
+#在某一列中包含root即可（模糊查找） $1 为第一列
+[root@A ~]# awk -F: '$1~/root/{print $3}' /etc/passwd
+0
+#$6 为第六列
+[root@A ~]# awk -F: '$6~/root/{print $3}' /etc/passwd
+0
+11
+2.数字和字符比较
+== != > >= < <=
+#打印UID大于1000的用户名（打印普通用户 系统用户的UID在(1-1000)之内）
+[root@A ~]# awk -F: '$3>1000{print $1}' /etc/passwd
+#打印用户名为root 的信息 
+[root@A ~]# awk -F: '$1=="root"' /etc/passwd
+root:x:0:0:root:/root:/bin/bash
+
+3.逻辑&& ||
+
+#UID大于10 并且小于20的用户信息
+    [root@A ~]# awk -F: '$3>10&&$3<20' /etc/passwd
+    operator:x:11:0:operator:/root:/sbin/nologin
+    games:x:12:100:games:/usr/games:/sbin/nologin
+    ftp:x:14:50:FTP User:/var/ftp:/sbin/nologin
+4.运算
+
+[root@A ~]# awk 'BEGIN{x=3;y=4;print x+y}'
+7
+[root@A ~]# awk 'BEGIN{x=3;y=4;print x*y}'
+12
+[root@A ~]# awk 'BEGIN{print 3.5*2.2}'
+7.7
+[root@A ~]# awk 'BEGIN{x=3;print x*y}'  #y 不赋值默认为0
+0
+显示100以内7的倍数或者包含7的数
+[root@A ~]# seq 100 | awk '$1%7==0||$1~/7/'
+if指令
+if(){}
+if(){}else{}
+if(){}else if(){}...
+
+统计普通用户有多少，系统用户有多少
+[root@B ~]# awk -F: '{if($3<1000){x++}else{y++}}END{print "系统用户：",x,"\t普通用户：",y}' /etc/passwd
+系统用户： 41    普通用户： 2
+[root@B ~]# awk -F: '$3>=1000' /etc/passwd
+nfsnobody:x:65534:65534:Anonymous NFS User:/var/lib/nfs:/sbin/nologin
+usetr:x:1000:1000:usetr:/home/usetr:/bin/bash
+while指令
+while(){}
+
+[root@B ~]# cat a.txt 
+root hehe root
+xixi root
+ni hao ma root
+[root@B ~]# awk '{i=1;while(i<=NF){if($i=="root"){x++};i++}}END{print x}' a.txt
+4
+实验：awk统计http服务访问次数
+虚拟机（http 服务端）
+
+[root@A ~]# systemctl restart  httpd.service 
+[root@A ~]# ll -h /var/log/httpd/access_log 
+-rw-r--r--. 1 root root 2.7K 11月 28 03:11 /var/log/httpd/access_log
+[root@A ~]# firewall-cmd --set-default-zone=trusted 
+success
+[root@A ~]# setenforce 0
+模仿用户访问1000次
+真实机 （客户端）
+
+[root@room1pc32 桌面]# yum -y install httpd-tools
+[root@room1pc32 桌面]# ab -c 100 -n 1000 http://172.25.0.100/
+查看http用户访问日志
+虚拟机 （http 服务端）
+
+[root@A ~]# ll -h /var/log/httpd/access_log 
+-rw-r--r--. 1 root root 95K 12月  3 20:14 /var/log/httpd/access_log
+模仿用户访问10000次
+真实机 （客户端）
+
+[root@room1pc32 桌面]# ab -c 100 -n 10000 http://172.25.0.100/
+查看http用户访问日志
+虚拟机 （http 服务端）
+
+[root@A ~]# ll -h /var/log/httpd/access_log 
+-rw-r--r--. 1 root root 1013K 12月  3 20:16 /var/log/httpd/access_log
+统计httpd_access每个人的统计次数
+
+[root@A ~]# awk '{ip[$1]++} END{for (i in ip){print i, ip[i] }}' /var/log/httpd/access_log
+::1 20
+172.25.0.250 11000
+练习脚本
+1.一键部署nginx源码包,麻烦]
+#!/bin/bash
+#这是我自己写的yum判断
+bash /root/yum.sh
+echo -n '正在解压nginx...'
+tar -xf nginx-1.8.0.tar.gz &>/dev/null 
+cd nginx-1.8.0
+echo -e "\e[32;1m[OK]\e[0m"
+echo -n '正在安装依赖包...'
+yum -y install gcc pcre-devel openssl-devel &>/dev/null
+echo -e "\e[32;1m[OK]\e[0m"
+echo -n './configure 配置...'
+./configure &>/dev/null
+echo -e "\e[32;1m[OK]\e[0m"
+echo -n 'make编译...'
+make &>/dev/null
+echo -e "\e[32;1m[OK]\e[0m"
+echo -n 'make install 安装...'
+make install &>/dev/null
+echo -e "\e[32;1m[OK]\e[0m"
+
+a=`ls /usr/local/nginx/ | wc -l`
+if [ $a -eq 0 ];then
+    echo -n '安装失败'
+    echo -e "\e[31;1m[Failed]\e[0m"
+else    
+    echo -n '安装成功'
+    echo -e "\e[32;1m[OK]\e[0m"
+fi
+2.nginx启动服务的脚本
+#!/bin/bash
+case $1 in
+start)
+/usr/local/nginx/sbin/nginx;;
+stop)
+/usr/local/nginx/sbin/nginx -s stop;;
+reastart)
+/usr/local/nginx/sbin/nginx -s stop
+/usr/local/nginx/sbin/nginx;;
+status)
+netstat -ntulp | grep nginx &> /dev/null
+if [ $? -eq 0 ];then
+echo -e "Active: active \033[32m(running)\033[0m"
+else
+echo -e "Active: inactive \033[31m(dead)\033[0m"
+fi;;
+*)
+echo Error;;
+esac
+
+4.检查/var/log/secure看看有没有人尝试破解密码
+#!/bin/bash
+while :
+do
+rm -rf ip.txt
+#这里我使用的是访问失败12次就被标记
+awk '/Failed/{print $11}' /var/log/secure | awk '{ip[$1]++} END{for(i in ip){if(ip[i]>=12){print i}}}' >> ip.txt
+for i in cat ip.txt
+do
+#这里暂时将标记的ip放入block区中
+firewall-cmd --zone=block --add-source=$i &> /dev/null
+done
+sleep 10
+done
+
+3.监控脚本(awk过滤):
+#!/bin/bash
+CPU=uptime | awk '{print$10}'
+echo "当前CPU负载为：${CPU}"
+#这里RX1和RX2是相等的RX1是为了方便计算，RX2是为了使用户查看方便
+RX1=ifconfig eth0 | awk '/RX p/{print $5}'
+RX2=ifconfig eth0 | awk -F\( '/RX p/{print $2}' | sed 's/[)]//'
+echo "当前网卡接受的数据流量：$RX2"
+#这里TX1和TX2是相等的RX1是为了方便计算，RX2是为了使用户查看方便
+TX1=ifconfig eth0 | awk '/TX p/{print $5}'
+TX2=ifconfig eth0 | awk -F\( '/TX p/{print $2}' | sed 's/[)]//'
+echo "当前网卡接受的数据流量：$TX2"
+FREE=free | awk '/Mem/{print $4}'
+echo "当前内存剩余：$FREE"
+ROOTFREE=df | awk '/\/$/{print $4}'
+echo "当前根份区的剩余容量：$ROOTFREE"
+USERS=cat /etc/passwd | wc -l
+echo "当前计算机的账户数量:$USER"
+USERNOW=who | awk 'END{print NR}'
+echo "当前登陆了几个人:$USERNOW"
+NUM=ps aux | wc -l
+echo "当前开启的进程数量: $NUM"
+SNUM=rpm -qa | wc -l
+echo "已经安装了多少软件:$SNUM"

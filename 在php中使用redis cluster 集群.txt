@@ -1,0 +1,176 @@
+目前我们用到的 php 的 redis 扩展 主要有2个，第一个是最常用的 phpredis, 它是用c写的php的高效扩展：https://github.com/phpredis/phpredis，还有1个是predis, 它是用php代码写的，也用的蛮多的：https://github.com/nrk/predis。
+
+我们分别看下他们在集群中的用法。
+
+phpredis
+
+phpredis的安装
+
+我Mac上是有安装过phpredis扩展的，但是是2.* 版本，是不支持cluster的，所以需要升级到3.0扩展。我记录下升级过程：
+
+~ git clone git@github.com:phpredis/phpredis.git
+~ cd phpredis
+~ git fetch
+~ git checout feature/redis_cluster #切换到cluster分支
+~ phpize
+~ ./configure
+~ make
+~ make install
+Installing shared extensions:     /usr/local/php5/lib/php/extensions/no-debug-non-zts-20131226/
+这样就可以用了。如果你是第一次安装redis扩展，还需要在php.ini中加上：
+
+extension=redis.so
+3.0版本的redis扩展已经安装好了。我们可以重启一下php-fpm。
+
+➜ sudo kill -USR2 `cat /usr/local/var/run/php-fpm.pid`
+官方的文档太少了：https://github.com/phpredis/phpredis/blob/feature/redis_cluster/cluster.markdown。就这一个。
+
+就根据这个文档来学习简单学习下吧：
+
+先完成初始化连接到redis cluster服务器：
+
+$obj_cluster = new RedisCluster(NULL, ['192.168.33.13:7000', '192.168.33.13:7001', '192.168.33.13:7002', '192.168.33.13:7003', '192.168.33.13:7004']);
+var_dump($obj_cluster);
+第一个参数传NULL 别问我，我也不知道为啥。反正文档没找到，这篇也没看懂。 
+第二个参数是我们需要连接的redis cluster的master服务器列表。我们有5个master，就填5个。
+
+打印结果如下：
+
+class RedisCluster#5 (0) {}
+一个RedisCluster 类资源。表示redis 已经连接成功了。
+
+那么，我们就可以实用之前redis的方法来尝试了：
+
+$obj_cluster->set('name1', '1111');
+$obj_cluster->set('name2', '2222');
+$obj_cluster->set('name3', '333');
+$name1 = $obj_cluster->get('name1');
+$name2 = $obj_cluster->get('name2');
+$name3 = $obj_cluster->get('name3');
+var_dump($name1, $name2, $name3);die;
+结果如下：
+
+string(4) "1111"
+string(4) "2222"
+string(3) "333"
+很完美，没啥问题。而且，他是直接就给结果了。
+
+前面的redis cluster 的学习，我们知道name1, name2, name3 是3个key , 会按照算法，分配到3个slot上，有可能分到3台服务器上。
+
+我们连接客户端看下：
+
+➜  redis-cli -h 192.168.33.13 -p 7009 -c
+192.168.33.13:7009> get name1
+-> Redirected to slot [12933] located at 192.168.33.13:7003
+"1111"
+192.168.33.13:7003> get name2
+-> Redirected to slot [742] located at 192.168.33.13:7000
+"2222"
+192.168.33.13:7000> get name3
+-> Redirected to slot [4807] located at 192.168.33.13:7001
+"333"
+192.168.33.13:7001>
+客户端是有跳转的，而php的扩展phpredis直接就给出结果了，这点很赞。
+
+phpredis的使用
+
+我们继续看这个蛋疼的文档，它还提供了一种连接方式：
+
+// Connect and specify timeout and read_timeout
+$obj_cluster = new RedisCluster(
+    NULL, Array("host:7000", "host:7001", 1.5, 1.5);
+);
+后面加入了timeout和read_timeout功能。就是加到master列表的后面。
+
+timeout表示连接redis的最长时间，这里设为1.5秒，表示超过1.5秒要是还没连接成功就返回false 。
+
+read_timeout表示连接redis成功后，读取一个key的超时时间，有时候读取一个key 可能value比较大，读取需要很长时间，这里设置1.5秒，表示要是过了1.5秒还没读取到数据就返回false。
+
+好。我们试一下：
+
+$obj_cluster = new RedisCluster(NULL, ['192.168.33.13:7000', '192.168.33.13:7001', '192.168.33.13:7002', '192.168.33.13:7003', '192.168.33.13:7004', 1.5, 1.5]);
+在master列表后面加入了2个参数。其实的操作几乎一样。
+
+我尝试的只用了一个master去连接，发现也可以，并没什么差别？？？
+
+如下：
+
+$obj_cluster = new RedisCluster(NULL, ['192.168.33.13:7000', 1.5, 1.5]);
+$obj_cluster->set('name1', '1111');
+$name1 = $obj_cluster->get('name1');
+var_dump($name1);
+//输出
+string(4) "1111"
+只填一个也可以。我在想，它是不是自己就能识别啊。不需要填这么多啊。但是，我没找到相关的文档，证明我的观点。
+
+而且，我换一个slave来连接，写也可以成功！！！
+
+//7009是个slave
+$obj_cluster = new RedisCluster(NULL, ['192.168.33.13:7009', 1.5, 1.5]);
+$obj_cluster->set('name1', '4555');
+$name1 = $obj_cluster->get('name1');
+var_dump($name1);
+//输出
+string(4) "4555"
+好吧。我姑且认为，它会自动内部判断主从。还蛮厉害的。
+
+还有其他的功能和命令，例如：zadd、lpop、hget等。就不说了。
+
+predis
+
+predis的下载安装
+
+predis是一套用php代码写的php连接redis的扩展，用到了命名空间，我之前用过，其实效率还可以，比phpredis稍微低一点，但是它由于接口众多，所以功能很强大。
+
+网页redis管理工具phpRedisAdmin （https://github.com/ErikDubbelboer/phpRedisAdmin）就是用的predis作为连接的。
+
+好，先下载看看。可以用composer 或者 git clone。我这里用git clone 吧。最新的稳定版本是 v1.03
+
+➜  redis  git clone git@github.com:nrk/predis.git
+➜  redis  cd predis
+➜  predis git:(master) git checkout v1.0.3 #切换到最新的文档版本
+➜  predis git:(84060b9)
+OK，我新建一个test.php 文件，我们再测试一下cluster业务。
+
+<?php
+require 'predis/autoload.php';
+$servers = [
+    'tcp://192.168.33.13:7000',
+    'tcp://192.168.33.13:7001',
+    'tcp://192.168.33.13:7002',
+    'tcp://192.168.33.13:7003',
+    'tcp://192.168.33.13:7004',
+    ];
+$options = ['cluster' => 'redis'];
+$client = new Predis\Client($servers, $options);
+$client->set('name1', '1111111');
+$client->set('name2', '2222222');
+$client->set('name3', '3333333');
+$name1 = $client->get('name1');
+$name2 = $client->get('name2');
+$name3 = $client->get('name3');
+var_dump($name1, $name2, $name3);die;
+打印结果：
+
+➜  redis  php test.php
+string(7) "1111111"
+string(7) "2222222"
+string(7) "3333333"
+非常棒～
+
+当然，它也类似，只填写一个也是可以的，目前发现没什么坑，也没文档说明为啥可以：
+
+require 'predis/autoload.php';
+$servers = [
+    'tcp://192.168.33.13:7000',
+    ];
+$options = ['cluster' => 'redis'];
+$client = new Predis\Client($servers, $options);
+$client->set('name1', '1111111');
+其他的一些用法也是类似的：
+
+$client->hset('name77', 'name', 'yang');
+$b = $client->hget('name77', 'name');
+...
+...
+先到这，其他的都和之前的redis 一样使用。

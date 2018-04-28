@@ -1,0 +1,48 @@
+root@test:~/redis-3.2.10# cat redis.sh 
+function create_dir
+{
+#创建数据文件和配置文件目录
+port="7001 7002 7003 7004 7005 8000 8001 8002 8003 8004 8005"
+for i in $port; do
+mkdir -p /etc/redis/$i/
+mkdir -p /u01/redis-cluster-test/$i/data/
+done
+mkdir -p /u01/redis-cluster-test/log
+}
+ 
+function conf
+{
+# 修改配置文件
+port="7001 7002 7003 7004 7005 8000 8001 8002 8003 8004 8005 "
+for i in $port;
+do
+cp /etc/redis/7000/redis.conf /etc/redis/$i/  #copy redis.conf
+cd /etc/redis/$i/
+sed -i "s/7000/$i/g" redis.conf 
+done
+}
+ 
+ 
+function start_redis
+{
+ 
+/root/redis-3.2.10/src/redis-server  /etc/redis/7000/redis.conf &
+/root/redis-3.2.10/src/redis-server /etc/redis/7001/redis.conf &
+/root/redis-3.2.10/src/redis-server /etc/redis/7002/redis.conf &
+/root/redis-3.2.10/src/redis-server /etc/redis/7003/redis.conf &
+/root/redis-3.2.10/src/redis-server /etc/redis/7004/redis.conf &
+/root/redis-3.2.10/src/redis-server /etc/redis/7005/redis.conf &
+ 
+ 
+ 
+/root/redis-3.2.10/src/redis-server /etc/redis/8000/redis.conf &
+/root/redis-3.2.10/src/redis-server /etc/redis/8001/redis.conf &
+/root/redis-3.2.10/src/redis-server /etc/redis/8002/redis.conf &
+/root/redis-3.2.10/src/redis-server /etc/redis/8003/redis.conf &
+/root/redis-3.2.10/src/redis-server /etc/redis/8004/redis.conf &
+/root/redis-3.2.10/src/redis-server /etc/redis/8005/redis.conf &
+}
+ 
+create_dir
+conf
+start_redis

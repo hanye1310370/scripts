@@ -1,0 +1,22 @@
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+ 
+SERVER = 'localhost'
+FROM = 'root@localhost'
+TO = ['1549214808@qq.com,']    #添加收件人
+SUBJECT = u'san Linx福利'
+TEXT = u"""
+    linux基础
+    链接：http://pan.baidu.com/s/1mhBDhnM
+"""
+msg = MIMEMultipart('alternative')
+# 注意包含了非ASCII字符，需要使用unicode
+msg['Subject'] = SUBJECT
+msg['From'] = FROM
+msg['To'] = ', '.join(TO)
+part = MIMEText(TEXT, 'plain', 'utf-8')
+msg.attach(part)
+server = smtplib.SMTP(SERVER)
+server.sendmail(FROM, TO, msg.as_string().encode('ascii'))
+server.quit()

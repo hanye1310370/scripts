@@ -1,0 +1,38 @@
+CentOS 7安装GitLab还是比较简单的，按照官方文档的提示一步一步操作下来，就一个地方需要修改。
+参考：GitLab安装说明
+在安装好以后，运行
+[plain] view plain copy
+gitlab-ctl reconfigure  
+
+之前，需要修改GitLab的配置文件
+[plain] view plain copy
+/etc/gitlab/gitlab.rb  
+将其中
+[plain] view plain copy
+export_url 'xxxxxxxxx'  
+
+修改为
+[plain] view plain copy
+export_url='xxxxxxxx'  
+否则在运行reconfigure时候汇报错。
+
+另外，比较不容易弄清楚的是通过SMTP配置发送邮件的功能。网上很多的例子就都以前版本的，随着GitLab版本的升级，配置的方法也在不断的变化。
+
+就目前7.5.3这个版本来说，直接修改上面的
+[plain] view plain copy
+/etc/gitlab/gitlab.rb  
+就可以了。内容如下，以腾讯企业邮箱为例：
+[ruby] view plain copy
+gitlab_rails['smtp_enable'] = true  
+gitlab_rails['smtp_address'] = "smtp.exmail.qq.com"  
+gitlab_rails['smtp_port'] = 25  
+gitlab_rails['smtp_user_name'] = "发送邮件的帐号"  
+gitlab_rails['smtp_password'] = "发送邮件帐号的密码"  
+gitlab_rails['smtp_domain'] = "smtp.qq.com"  
+gitlab_rails['smtp_authentication'] = :plain  
+gitlab_rails['smtp_enable_starttls_auto'] = true  
+  
+gitlab_rails['gitlab_email_from'] = "与发送邮件的帐号相同"  
+user["git_user_email"] = "与发送邮件的帐号相同"  
+
+这里，端口使用的是25，不是腾讯企业邮箱官方说的465，请注意。

@@ -1,0 +1,56 @@
+ import java.util.ArrayList;
+ import java.util.List;
+ 
+ import com.mongodb.BasicDBObject;
+ import com.mongodb.DB;
+ import com.mongodb.DBCollection;
+ import com.mongodb.DBObject;
+ import com.mongodb.MongoClient;
+ import com.mongodb.ServerAddress;
+ 
+ public class TestMongoDBShards {
+ 
+     public static void main(String[] args) {
+          try {
+              List<ServerAddress> addresses = new ArrayList<ServerAddress>();
+              ServerAddress address1 = new ServerAddress("172.16.16.124" , 50001);
+              ServerAddress address2 = new ServerAddress("172.16.16.125" , 50001);
+              ServerAddress address3 = new ServerAddress("172.16.16.126" , 50001);
+              ServerAddress address4 = new ServerAddress("172.16.16.131" , 50001);
+              addresses.add(address1);
+             addresses.add(address2);
+             addresses.add(address3);
+ 
+              MongoClient client = new MongoClient(addresses);
+              DB db = client.getDB( "testdb" );
+              DBCollection coll = db.getCollection( "table1" );
+ 
+            //  BasicDBObject object = new BasicDBObject();
+           //   object.append( "id" , 1);
+ 
+           //   DBObject dbObject = coll.findOne(object);
+              
+              for(int i=1;i<=1000000;i++) {
+                  DBObject saveData=new BasicDBObject();  
+                  saveData.put("id", i);
+                  saveData.put("userName", "baiwan" + i);  
+                  saveData.put("age", "26");  
+                  saveData.put("gender", "m");  
+      
+      
+                  coll.save(saveData); 
+              }
+              
+  
+              
+ 
+             // System. out .println(dbObject);
+ 
+        } catch (Exception e) {
+              e.printStackTrace();
+        }
+         // TODO Auto-generated method stub
+ 
+     }
+ 
+ }

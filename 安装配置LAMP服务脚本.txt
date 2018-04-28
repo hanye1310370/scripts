@@ -1,0 +1,128 @@
+本脚本实例要求如下：
+
+源码安装lamp环境,要求在字符终端下执行脚本(ls -l /usr/src显示不同)
+
+所需tar包都已复制到/usr/src目录下
+
+#!/bin/bash
+rpm -q httpd &> /dev/null
+if [ $? -eq 0 ];then
+yum -y remove httpd &> /dev/null
+fi
+ls -l /usr/local/ | grep httpd &> /dev/null
+if [ $? -ne 0 ];then
+httpball=`ls /usr/src/httpd*.gz`
+tar zxf $httpball -C /usr/src &> /dev/null
+
+dir=`ls -l /usr/src | grep ^d  | grep httpd | awk '{print $9}'`
+cd /usr/src/$dir
+./configure --prefix=/usr/local/httpd --enable-so --enable-rewrite --enable-charset-lite --enable-cgi && make && make install
+
+ln -s /usr/local/httpd/bin/* /usr/local/bin
+cp /usr/local/httpd/bin/apachectl /etc/init.d/httpd
+
+sed -i '1a #chkconfig: 35 85 15 \
+#description: httpd server' /etc/init.d/httpd
+chkconfig --add httpd
+chkconfig httpd on
+service httpd start
+fi
+
+rpm -q mysql-server &> /dev/null
+if [ $? -eq 0 ];then
+yum -y mysql-server mysql &> /dev/null
+fi
+ls -l /usr/local | grep mysql &> /dev/null
+if [ $? -ne 0 ];then
+grep mysql /etc/passwd &> /dev/null
+if [ $? -ne 0 ]; then
+useradd -M -u 49 -s /sbin/nologin mysql
+fi
+       mysqlball=`ls /usr/src/mysql*.gz`
+       tar zxf $mysqlball -C /usr/src &> /dev/null
+
+       dir=`ls -l /usr/src | grep ^d  | grep mysql | awk '{print $9}'`
+       cd /usr/src/$dir
+./configure --prefix=/usr/local/mysql --with-charset=utf8 --with-collation=utf8_general_ci --with-extra-charset=gbk,gb2312 && make && make install
+cp support-files/my-medium.cnf /etc/my.cnf
+/usr/local/mysql/bin/mysql_install_db --user=mysql
+chown -R root:mysql /usr/local/mysql
+chown -R mysql /usr/local/mysql/var
+ln -s /usr/local/mysql/bin/* /usr/local/bin
+ln -s /usr/local/mysql/lib/mysql/* /usr/lib
+ln -s /usr/local/mysql/include/mysql/* /usr/include
+cp support-files/mysql.server /etc/rc.d/init.d/mysqld
+chmod a+x /etc/rc.d/init.d/mysqld
+chkconfig --add mysqld
+chkconfig mysqld on
+service mysqld start
+fi
+
+ls -l /usr/local/lib/ | grep libmcrypt &> /dev/null
+if [ $? -ne 0 ];then
+       libmcryptball=`ls /usr/src/libmcrypt*.gz`
+       tar zxf $libmcryptball -C /usr/src &> /dev/null
+
+       dir=`ls -l /usr/src | grep ^d  | grep libmcrypt | awk '{print $9}'`
+       cd /usr/src/$dir
+./configure && make && make install
+ln -s /usr/local/lib/libmcrypt.* /usr/lib
+fi
+ls -l /usr/local/lib/ | grep libmhash &> /dev/null
+if [ $? -ne 0 ];then
+       mhashball=`ls /usr/src/mhash*.gz`
+       tar zxf $mhashball -C /usr/src &> /dev/null
+
+       dir=`ls -l /usr/src | grep ^d  | grep mhash | awk '{print $9}'`
+       cd /usr/src/$dir
+./configure && make && make install
+ln -s /usr/local/lib/libmhash* /usr/lib
+fi
+
+ls -l /usr/local/lib/ | grep mcrypt &> /dev/null
+if [ $? -ne 0 ];then
+       mcryptball=`ls /usr/src/mcrypt*.gz`
+       tar zxf $mcryptball -C /usr/src &> /dev/null
+
+       dir=`ls -l /usr/src | grep ^d  | grep mcrypt | awk '{print $9}'`
+       cd /usr/src/$dir
+./configure && make && make install
+fi
+rpm -q php &> /dev/null
+if [ $? -eq 0 ];then
+yum -y php &> /dev/null
+fi
+ls -l /usr/local/ | grep php &> /dev/null
+if [ $? -ne 0 ];then
+       phpball=`ls /usr/src/php-*.gz`
+       tar zxf $phpball -C /usr/src &> /dev/null
+
+       dir=`ls -l /usr/src | grep ^d  | grep php | awk '{print $9}'`
+       cd /usr/src/$dir
+./configure --prefix=/usr/local/php5 --with-mcrypt --enable-mbstring --with-apxs2=/usr/local/httpd/bin/apxs --with-mysql=/usr/local/mysql --with-config-file-path=/usr/local/php5 && make && make install
+cp php.ini-development /usr/local/php5/php.ini
+echo "default_charset = \"iso-8859-1\"">> /usr/local/php5/php.ini
+sed -i 's/short_open_tag = Off/short_open_tag = On/' /usr/local/php5/php.ini
+
+fi
+find /usr/local/php5 -name Zend* &> /dev/null
+if [ $? -ne 0 ];then
+       Zendball=`ls /usr/src/Zend*.gz`
+       tar zxf $Zendball -C /usr/src &> /dev/null
+
+       dir=`ls -l /usr/src | grep ^d  | grep Zend | awk '{print $9}'`
+dir1=`ls -l $dir | grep ^d |awk '{print $9}'`
+cd /usr/src/$dir/$dir1
+cp Zend*.so /usr/local/php5/lib/php
+echo "zend_extension=/usr/local/php5/lib/php/ZendGuardLoader.so
+zend_loader.enable=1">> /usr/local/php5/php.ini
+
+fi
+grep "x-httpd-php" /usr/local/httpd/conf/httpd.conf &> /dev/null
+if [ $? -ne 0 ]; then
+phpline=`grep -n mime_module /usr/local/httpd/conf/httpd.conf | awk -F: '{print $1}'`
+phpline1=`expr $phpline + 2`
+sed -i "${phpline1}a AddType application/x-httpd-php .php" /usr/local/httpd/conf/httpd.conf  
+sed -i 's/index.html/index.php &/' /usr/local/httpd/conf/httpd.conf
+service httpd restart
+fi

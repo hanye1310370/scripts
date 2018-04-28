@@ -1,0 +1,404 @@
+本文介绍如何在建表时只分库不分表。
+
+假设已经建好的分库数为 8，建一张表，只分库不分表，分库方式为根据 id 列哈希。
+
+CREATE TABLE multi_db_single_tbl(
+  id int, 
+  name varchar(30), 
+  primary key(id)
+) dbpartition by hash(id);
+查看该逻辑表的节点拓扑，可以看出在每个分库都创建了 1 张分表，既只做了分库。
+
+mysql> show topology from multi_db_single_tbl;
++------+------------------------------------------------------------------+---------------------+
+| ID   | GROUP_NAME                                                       | TABLE_NAME          |
++------+------------------------------------------------------------------+---------------------+
+|    0 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | multi_db_single_tbl |
+|    1 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | multi_db_single_tbl |
+|    2 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0002_RDS | multi_db_single_tbl |
+|    3 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0003_RDS | multi_db_single_tbl |
+|    4 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0004_RDS | multi_db_single_tbl |
+|    5 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0005_RDS | multi_db_single_tbl |
+|    6 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0006_RDS | multi_db_single_tbl |
+|    7 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | multi_db_single_tbl |
++------+------------------------------------------------------------------+---------------------+
+8 rows in set (0.01 sec)
+
+
+本文介绍如何使用不同的拆分方式进行分库分表：
+
+使用哈希函数做拆分
+使用双字段哈希函数做拆分
+使用日期做拆分
+以下示例均假设已经建好的分库数为 8。
+
+使用哈希函数做拆分
+
+建一张表，既分库又分表，每个库含有 3 张物理表，分库拆分方式为按照 id 列进行哈希，分表拆分方式为按照 bid 列进行哈希（先根据 id 列的值进行哈希运算，将表中数据分布在多个子库中，每个子库中的数据再根据 bid 列值的哈希运算结果分布在3个物理表中）。
+
+CREATE TABLE multi_db_multi_tbl(
+  id int auto_increment, 
+  bid int, 
+  name varchar(30), 
+  primary key(id)
+) dbpartition by hash(id) tbpartition by hash(bid) tbpartitions 3;
+查看该逻辑表的节点拓扑，可以看出在每个分库都创建了 3 张分表。
+
+mysql> show topology from multi_db_multi_tbl;
++------+------------------------------------------------------------------+-----------------------+
+| ID   | GROUP_NAME                                                       | TABLE_NAME            |
++------+------------------------------------------------------------------+-----------------------+
+|    0 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | multi_db_multi_tbl_00 |
+|    1 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | multi_db_multi_tbl_01 |
+|    2 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | multi_db_multi_tbl_02 |
+|    3 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | multi_db_multi_tbl_03 |
+|    4 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | multi_db_multi_tbl_04 |
+|    5 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | multi_db_multi_tbl_05 |
+|    6 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0002_RDS | multi_db_multi_tbl_06 |
+|    7 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0002_RDS | multi_db_multi_tbl_07 |
+|    8 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0002_RDS | multi_db_multi_tbl_08 |
+|    9 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0003_RDS | multi_db_multi_tbl_09 |
+|   10 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0003_RDS | multi_db_multi_tbl_10 |
+|   11 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0003_RDS | multi_db_multi_tbl_11 |
+|   12 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0004_RDS | multi_db_multi_tbl_12 |
+|   13 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0004_RDS | multi_db_multi_tbl_13 |
+|   14 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0004_RDS | multi_db_multi_tbl_14 |
+|   15 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0005_RDS | multi_db_multi_tbl_15 |
+|   16 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0005_RDS | multi_db_multi_tbl_16 |
+|   17 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0005_RDS | multi_db_multi_tbl_17 |
+|   18 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0006_RDS | multi_db_multi_tbl_18 |
+|   19 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0006_RDS | multi_db_multi_tbl_19 |
+|   20 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0006_RDS | multi_db_multi_tbl_20 |
+|   21 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | multi_db_multi_tbl_21 |
+|   22 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | multi_db_multi_tbl_22 |
+|   23 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | multi_db_multi_tbl_23 |
++------+------------------------------------------------------------------+-----------------------+
+24 rows in set (0.01 sec)
+查看该逻辑表的拆分规则，可以看出分库分表的拆分拆分方式均为哈希，分库的拆分键为 id，分表的拆分键为 bid。
+
+mysql> show rule from multi_db_multi_tbl;
++------+--------------------+-----------+------------------+---------------------+--------------------+------------------+---------------------+--------------------+
+| ID   | TABLE_NAME         | BROADCAST | DB_PARTITION_KEY | DB_PARTITION_POLICY | DB_PARTITION_COUNT | TB_PARTITION_KEY | TB_PARTITION_POLICY | TB_PARTITION_COUNT |
++------+--------------------+-----------+------------------+---------------------+--------------------+------------------+---------------------+--------------------+
+|    0 | multi_db_multi_tbl |         0 | id               | hash                | 8                  | bid              | hash                | 3                  |
++------+--------------------+-----------+------------------+---------------------+--------------------+------------------+---------------------+--------------------+
+1 row in set (0.01 sec)
+使用双字段哈希函数做拆分
+
+使用要求
+
+拆分键的类型必须是字符类型或数字类型。
+
+路由方式
+
+根据任一拆分键后 N 位计算哈希值，以哈希方式完成路由计算。N 为函数第三个参数。例如：RANGE_HASH(COL1, COL2, N)，计算时会优先选择 COL1 ，截取其后 N 位进行计算。 COL1 不存在时按 COL2 计算。
+
+适用场景
+
+适合于需要有两个拆分键，并且仅使用其中一个拆分键值进行查询时的场景。例如，假设用户的 DRDS 里已经分了 8 个物理库, 现业务有如下的场景：
+
+一个业务想按买家 ID 和订单 ID 对订单表进行分库；
+查询时条件仅有买家 ID 或订单 ID。
+此时可使用以下 DDL 对订单表进行构建：
+
+ create table test_order_tb (  
+           id int, 
+           seller_id varchar(30) DEFAULT NULL,
+           order_id varchar(30) DEFAULT NULL,
+           buyer_id varchar(30) DEFAULT NULL,
+           create_time datetime DEFAULT NULL,
+           primary key(id)
+   ) ENGINE=InnoDB DEFAULT CHARSET=utf8 dbpartition by RANGE_HASH(buyer_id, order_id, 10) tbpartition by RANGE_HASH(buyer_id, order_id, 10) tbpartitions 3;
+注意事项
+
+两个拆分键皆不能修改。
+插入数据时如果发现两个拆分键指向不同的分库或分表时，插入会失败。
+使用日期做拆分
+
+除了可以使用哈希函数做拆分算法，您还可以使用日期函数 MM/DD/WEEK/MMDD 来作为分表的拆分算法，具体参照以下五个示例：
+
+建一张表，既分库又分表，分库方式为根据 userId 列哈希，分表方式为根据 actionDate 列，按照一周七天来拆分（WEEK(actionDate)计算的是DAY_OF_WEEK）。
+
+比如 actionDate 列的值是 2017-02-27，这天是星期一，WEEK(actionDate)算出的值是2，该条记录就会被存储到 2（2 % 7 = 2）这张分表（位于某个分库，具体的表名是 user_log_2）；比如 actionDate 列的值是 2017-02-26，这天是星期天，WEEK(actionDate)算出的值是1，该条记录就会被存储到 1（1 % 7 = 1）这张分表（位于某个分库，具体的表名是 user_log_1）。
+
+CREATE TABLE user_log(
+userId int, 
+name varchar(30), 
+operation varchar(30), 
+actionDate DATE
+) dbpartition by hash(userId) tbpartition by WEEK(actionDate) tbpartitions 7;
+查看该逻辑表的节点拓扑，可以看出在每个分库都创建了 7 张分表（一周7天）。以下示例中返回的结果较长，用…做了省略处理。
+
+mysql> show topology from user_log;
++------+------------------------------------------------------------------+------------+
+| ID   | GROUP_NAME                                                       | TABLE_NAME |
++------+------------------------------------------------------------------+------------+
+|    0 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log_0 |
+|    1 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log_1 |
+|    2 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log_2 |
+|    3 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log_3 |
+|    4 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log_4 |
+|    5 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log_5 |
+|    6 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log_6 |
+|    7 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log_0 |
+|    8 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log_1 |
+|    9 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log_2 |
+|   10 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log_3 |
+|   11 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log_4 |
+|   12 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log_5 |
+|   13 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log_6 |
+...
+|   49 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log_0 |
+|   50 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log_1 |
+|   51 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log_2 |
+|   52 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log_3 |
+|   53 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log_4 |
+|   54 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log_5 |
+|   55 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log_6 |
++------+------------------------------------------------------------------+------------+
+56 rows in set (0.01 sec)
+查看该逻辑表的拆分规则，可以看出分库的拆分方式为哈希，分库的拆分键为 userId，分表的拆分方式为按照时间函数 WEEK 进行拆分，分表的拆分键为 actionDate。
+
+mysql> show rule from user_log;
++------+------------+-----------+------------------+---------------------+--------------------+------------------+---------------------+--------------------+
+| ID   | TABLE_NAME | BROADCAST | DB_PARTITION_KEY | DB_PARTITION_POLICY | DB_PARTITION_COUNT | TB_PARTITION_KEY | TB_PARTITION_POLICY | TB_PARTITION_COUNT |
++------+------------+-----------+------------------+---------------------+--------------------+------------------+---------------------+--------------------+
+|    0 | user_log   |         0 | userId           | hash                | 8                  | actionDate       | week                | 7                  |
++------+------------+-----------+------------------+---------------------+--------------------+------------------+---------------------+--------------------+
+1 row in set (0.00 sec)
+查看给定分库键和分表键参数时， SQL 被路由到哪个物理分库和该物理分库下的哪张物理表。
+
+ddl_week_sharding
+
+建一张表，既分库又分表，分库方式为根据 userId 列哈希，分表方式为根据 actionDate 列，按照一年 12 个月进行拆分（MM(actionDate)计算的是MONTH_OF_YEAR）。
+
+比如 actionDate 列的值是 2017-02-27，MM(actionDate)算出的值是02，该条记录就会被存储到02（02 % 12 = 02）这张分表（位于某个分库，具体的表名是 user_log_02）；比如 actionDate 列的值是 2016-12-27，MM(actionDate)算出的值是 12，该条记录就会被存储到00（12 % 12 = 00）这张分表（位于某个分库，具体的表名是 user_log_00）。
+
+CREATE TABLE user_log2(
+userId int, 
+name varchar(30), 
+operation varchar(30), 
+actionDate DATE
+) dbpartition by hash(userId) tbpartition by MM(actionDate) tbpartitions 12;
+查看该逻辑表的节点拓扑，可以看出在每个分库都创建了 12 张分表（1 年有 12 个月）。由于返回结果较长，这里用…做了省略处理。
+
+mysql> show topology from user_log2;
++------+------------------------------------------------------------------+--------------+
+| ID   | GROUP_NAME                                                       | TABLE_NAME   |
++------+------------------------------------------------------------------+--------------+
+|    0 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log2_00 |
+|    1 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log2_01 |
+|    2 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log2_02 |
+|    3 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log2_03 |
+|    4 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log2_04 |
+|    5 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log2_05 |
+|    6 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log2_06 |
+|    7 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log2_07 |
+|    8 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log2_08 |
+|    9 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log2_09 |
+|   10 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log2_10 |
+|   11 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log2_11 |
+|   12 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log2_00 |
+|   13 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log2_01 |
+|   14 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log2_02 |
+|   15 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log2_03 |
+|   16 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log2_04 |
+|   17 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log2_05 |
+|   18 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log2_06 |
+|   19 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log2_07 |
+|   20 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log2_08 |
+|   21 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log2_09 |
+|   22 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log2_10 |
+|   23 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0001_RDS | user_log2_11 |
+...
+|   84 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log2_00 |
+|   85 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log2_01 |
+|   86 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log2_02 |
+|   87 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log2_03 |
+|   88 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log2_04 |
+|   89 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log2_05 |
+|   90 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log2_06 |
+|   91 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log2_07 |
+|   92 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log2_08 |
+|   93 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log2_09 |
+|   94 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log2_10 |
+|   95 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log2_11 |
++------+------------------------------------------------------------------+--------------+
+96 rows in set (0.02 sec)
+查看该逻辑表的拆分规则，可以看出分库的拆分方式为哈希，分库的拆分键为 userId，分表的拆分方式为按照时间函数 MM 进行拆分，分表的拆分键为 actionDate。
+
+mysql> show rule from user_log2;
++------+------------+-----------+------------------+---------------------+--------------------+------------------+---------------------+--------------------+
+| ID   | TABLE_NAME | BROADCAST | DB_PARTITION_KEY | DB_PARTITION_POLICY | DB_PARTITION_COUNT | TB_PARTITION_KEY | TB_PARTITION_POLICY | TB_PARTITION_COUNT |
++------+------------+-----------+------------------+---------------------+--------------------+------------------+---------------------+--------------------+
+|    0 | user_log2  |         0 | userId           | hash                | 8                  | actionDate       | mm                  | 12                 |
++------+------------+-----------+------------------+---------------------+--------------------+------------------+---------------------+--------------------+
+1 row in set (0.00 sec)
+建一张表，既分库又分表，分库方式为根据 userId 列哈希，分表方式为按照一个月 31 天进行拆分（函数DD(actionDate)计算的是DAY_OF_MONTH）。
+
+比如 actionDate 列的值是 2017-02-27，DD(actionDate)算出的值是 27，该条记录就会被存储到27（27 % 31 = 27）这张分表（位于某个分库，具体的表名是 user_log_27）。
+
+CREATE TABLE user_log3(
+userId int, 
+name varchar(30), 
+operation varchar(30), 
+actionDate DATE
+) dbpartition by hash(userId) tbpartition by DD(actionDate) tbpartitions 31;
+查看该逻辑表的节点拓扑，可以看出在每个分库都创建了 31 张分表（按每个月有31天处理）。由于返回的结果较长，这里用…做了省略处理。
+
+mysql> show topology from user_log3;
++------+------------------------------------------------------------------+--------------+
+| ID   | GROUP_NAME                                                       | TABLE_NAME   |
++------+------------------------------------------------------------------+--------------+
+|    0 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_00 |
+|    1 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_01 |
+|    2 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_02 |
+|    3 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_03 |
+|    4 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_04 |
+|    5 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_05 |
+|    6 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_06 |
+|    7 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_07 |
+|    8 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_08 |
+|    9 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_09 |
+|   10 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_10 |
+|   11 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_11 |
+|   12 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_12 |
+|   13 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_13 |
+|   14 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_14 |
+|   15 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_15 |
+|   16 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_16 |
+|   17 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_17 |
+|   18 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_18 |
+|   19 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_19 |
+|   20 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_20 |
+|   21 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_21 |
+|   22 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_22 |
+|   23 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_23 |
+|   24 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_24 |
+|   25 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_25 |
+|   26 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_26 |
+|   27 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_27 |
+|   28 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_28 |
+|   29 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_29 |
+|   30 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log3_30 |
+...
+|  237 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log3_20 |
+|  238 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log3_21 |
+|  239 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log3_22 |
+|  240 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log3_23 |
+|  241 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log3_24 |
+|  242 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log3_25 |
+|  243 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log3_26 |
+|  244 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log3_27 |
+|  245 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log3_28 |
+|  246 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log3_29 |
+|  247 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log3_30 |
++------+------------------------------------------------------------------+--------------+
+248 rows in set (0.01 sec)
+查看该逻辑表的拆分规则，可以看出分库的拆分方式为哈希，分库的拆分键为 userId，分表的拆分方式为按照时间函数 DD 进行拆分，分表的拆分键为 actionDate。
+
+mysql> show rule from user_log3;
++------+------------+-----------+------------------+---------------------+--------------------+------------------+---------------------+--------------------+
+| ID   | TABLE_NAME | BROADCAST | DB_PARTITION_KEY | DB_PARTITION_POLICY | DB_PARTITION_COUNT | TB_PARTITION_KEY | TB_PARTITION_POLICY | TB_PARTITION_COUNT |
++------+------------+-----------+------------------+---------------------+--------------------+------------------+---------------------+--------------------+
+|    0 | user_log3  |         0 | userId           | hash                | 8                  | actionDate       | dd                  | 31                 |
++------+------------+-----------+------------------+---------------------+--------------------+------------------+---------------------+--------------------+
+1 row in set (0.01 sec)
+建一张表，既分库又分表，分库方式为根据 userId 列哈希，分表方式为按照一年 365 天进行拆分，路由到 365 张物理表（MMDD(actionDate) tbpartitions 365计算的是DAY_OF_YEAR % 365）。
+
+比如 actionDate 列的值是 2017-02-27，MMDD(actionDate)算出的值是 58，该条记录就会被存储到 58 这张分表（位于某个分库，具体的表名是user_log_58）。
+
+CREATE TABLE user_log4(
+userId int, 
+name varchar(30), 
+operation varchar(30), 
+actionDate DATE
+) dbpartition by hash(userId) tbpartition by MMDD(actionDate) tbpartitions 365;
+查看该逻辑表的节点拓扑，可以看出在每个分库都创建了 365 张分表（按每年有 365 天处理）。由于返回的结果较长，这里用…做了省略处理。
+
+mysql> show topology from user_log4;
++------+------------------------------------------------------------------+---------------+
+| ID   | GROUP_NAME                                                       | TABLE_NAME   |
++------+------------------------------------------------------------------+---------------+
+...
+| 2896 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_341 |
+| 2897 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_342 |
+| 2898 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_343 |
+| 2899 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_344 |
+| 2900 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_345 |
+| 2901 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_346 |
+| 2902 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_347 |
+| 2903 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_348 |
+| 2904 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_349 |
+| 2905 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_350 |
+| 2906 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_351 |
+| 2907 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_352 |
+| 2908 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_353 |
+| 2909 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_354 |
+| 2910 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_355 |
+| 2911 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_356 |
+| 2912 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_357 |
+| 2913 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_358 |
+| 2914 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_359 |
+| 2915 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_360 |
+| 2916 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_361 |
+| 2917 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_362 |
+| 2918 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_363 |
+| 2919 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log4_364 |
++------+------------------------------------------------------------------+---------------+
+2920 rows in set (0.07 sec)
+查看该逻辑表的拆分规则，可以看出分库的拆分方式为哈希，分库的拆分键为 userId，分表的拆分方式为按照时间函数 MMDD 进行拆分，分表的拆分键为 actionDate。
+
+mysql> show rule from user_log4;
++------+------------+-----------+------------------+---------------------+--------------------+------------------+---------------------+--------------------+
+| ID   | TABLE_NAME | BROADCAST | DB_PARTITION_KEY | DB_PARTITION_POLICY | DB_PARTITION_COUNT | TB_PARTITION_KEY | TB_PARTITION_POLICY | TB_PARTITION_COUNT |
++------+------------+-----------+------------------+---------------------+--------------------+------------------+---------------------+--------------------+
+|    0 | user_log4  |         0 | userId           | hash                | 8                  | actionDate       | mmdd                | 365                |
++------+------------+-----------+------------------+---------------------+--------------------+------------------+---------------------+--------------------+
+1 row in set (0.02 sec)
+建一张表，既分库又分表，分库方式为根据 userId 列哈希，分表方式为按照一年 365 天进行拆分，路由到 10 张物理表（MMDD(actionDate) tbpartitions 10计算的是DAY_OF_YEAR % 10）。
+
+CREATE TABLE user_log5(
+userId int, 
+name varchar(30), 
+operation varchar(30), 
+actionDate DATE
+) dbpartition by hash(userId) tbpartition by MMDD(actionDate) tbpartitions 10;
+查看该逻辑表的节点拓扑，可以看出在每个分库都创建了 10 张分表（按照一年 365 天进行拆分，路由到 10 张物理表）。由于返回的结果较长，这里用…做了省略处理。
+
+mysql> show topology from user_log5;
++------+------------------------------------------------------------------+--------------+
+| ID   | GROUP_NAME                                                       | TABLE_NAME   |
++------+------------------------------------------------------------------+--------------+
+|    0 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log5_00 |
+|    1 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log5_01 |
+|    2 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log5_02 |
+|    3 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log5_03 |
+|    4 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log5_04 |
+|    5 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log5_05 |
+|    6 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log5_06 |
+|    7 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log5_07 |
+|    8 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log5_08 |
+|    9 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0000_RDS | user_log5_09 |
+...
+|   70 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log5_00 |
+|   71 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log5_01 |
+|   72 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log5_02 |
+|   73 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log5_03 |
+|   74 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log5_04 |
+|   75 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log5_05 |
+|   76 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log5_06 |
+|   77 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log5_07 |
+|   78 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log5_08 |
+|   79 | SANGUAN_TEST_123_1488766060743ACTJSANGUAN_TEST_123_WVVP_0007_RDS | user_log5_09 |
++------+------------------------------------------------------------------+--------------+
+80 rows in set (0.02 sec)
+查看该逻辑表的拆分规则，可以看出分库的拆分方式为哈希，分库的拆分键为 userId，分表的拆分方式为按照时间函数 MMDD 进行拆分，路由到10张物理表，分表的拆分键为 actionDate。
+
+mysql> show rule from user_log5;
++------+------------+-----------+------------------+---------------------+--------------------+------------------+---------------------+--------------------+
+| ID   | TABLE_NAME | BROADCAST | DB_PARTITION_KEY | DB_PARTITION_POLICY | DB_PARTITION_COUNT | TB_PARTITION_KEY | TB_PARTITION_POLICY | TB_PARTITION_COUNT |
++------+------------+-----------+------------------+---------------------+--------------------+------------------+---------------------+--------------------+
+|    0 | user_log5  |         0 | userId           | hash                | 8                  | actionDate       | mmdd                | 10                 |
++------+------------+-----------+------------------+---------------------+--------------------+------------------+---------------------+--------------------+
+1 row in set (0.01 sec)

@@ -1,0 +1,24 @@
+四、使用密码
+
+1、FTP
+
+对于ftp文件来说，应当加用户名和密码加入到URL地址中，用法如下：
+
+curl ftp://name:passwd@machine.domain:port/full/path/to/file
+1
+或者使用参数-u来指定用户名和密码，用法如下：
+
+curl -u name:passwd ftp://machine.domain:port/full/path/to/file
+
+4、HTTP
+
+Curl同样支持在HTTP``URL中使用用户名和密码，因此你可以使用下面的方法从服务上获取文件：
+
+curl http://name:passwd@machine.domain/full/path/to/file
+1
+或者另行使用参数来指定用户名和密码：
+
+curl -u name:passwd http://machine.domain/full/path/to/file
+1
+在HTTP提供的诸多认证方式中，curl支持下列认证：Basic, Digest, NTLM 和 Negotiate (SPNEGO)。在未指定任何认证方式的情况下，curl默认使用Basic。你可以通过使用‘–anyauth’来告诉curl使用何种服务器能够接受的加密方式来访问指定的URL地址。 
+注意:根据URL的要求，HTTP URLs是不能包含用户名和密码的。因此curl在使用代理的情况下是无法以这种方式正常工作的，即使curl有时候是允许这样操作的。当使用代理的情况下，你必须使用参数-u来指定用户和密码。

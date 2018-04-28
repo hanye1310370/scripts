@@ -1,0 +1,157 @@
+最近服务器时不时出现Nginx 502 Bad Gateway，如果在电脑旁边还好，要是半夜或者出去了，怎么办？
+没关系，写个脚本检测服务状态，发现异常，自动重启。
+自动重启脚本：
+复制代码 代码如下:
+
+<?php 
+$url = 'http://blog.rebill.info'; 
+$cmd = '/usr/local/php/sbin/php-fpm restart'; 
+  
+for($i = 0; $i < 5; $i ++){ 
+        $exec = "curl  connect-timeout 3 -I $url 2>/dev/null"; 
+        $res = shell_exec($exec); 
+  
+        if(stripos($res, '502 Bad Gateway') !== false){ 
+                shell_exec($cmd); 
+                exit(); 
+        } 
+}
+
+原理就是用curl获取HTTP头，发现502状态码就执行重启php-fpm的命令。
+url和cmd根据实际情况改成自己的。然后放到crontab里一分钟执行一次。
+复制代码 代码如下:
+
+*/1 * * * * /usr/bin/php /root/crontab/nginx502.php
+
+
+
+
+
+#!/bin/bash
+resp=$(curl -Is http://qa.1fangxin.cn/?lid=910|grep "502 Bad Gateway")
+if [ "$resp" = "" ] 
+then
+echo "good"
+else
+$(sudo kill -USR2 `cat /usr/local/php/var/run/php-fpm.pid`)
+fi
+
+
+
+stat=`curl -I $site | head -1 | cut -d ' ' -f2`
+if [ $stat == "502" ]; then
+    service php-fpm restart 2>>/home/wwwlogs/502log.log
+    temp=`echo $?`
+    if [ $temp != "0" ]; then
+        restart_error
+    else
+        run_502
+    fi
+fi
+exit 0
+
+
+
+cat /data/sh/nginx_down.sh 
+#!/bin/bash
+down_cmd=`killall php-fpm`
+start_cmd=`/etc/init.d/php-fpm start`
+check_cmd=`curl -sI http://qa.1fangxin.cn|sed -n '1p'|awk '{print $2}'`
+if [ $check_cmd -eq 502 ]; then
+   $start_cmd
+   echo "php线程阻塞,重启完毕."
+else
+    echo "php线程无问题"
+fi
+
+
+
+fpm 的脚本
+
+Nginx
+
+运行在 Nginx 上的网站有时候会出现 “502 Bad Gateway” 错误，有些时候甚至频繁的出现。虽然重启可以解决问题，但是，我们不能随时掌握网站的情况，所以，最好能用办法解决这个问题。最开始，找了很多文章，结果导致 Nginx 502 错误的原因比较多，这些错误一般都不是nginx本身的问题，但是，如果对这些知之甚少的话，而且按照网上教的办法修改配置，不一定能对症解决问题。有的时候，可以从 log 里面看到，是 php-fpm 停止运行引起的 502 Bad Gateway。
+
+Feb 05 19:14:36.757137 [WARNING] fpm_children_bury(), line 215: child 1580 (pool default) exited on signal 15 SIGTERM after 179277.022410 seconds from start
+Feb 05 19:14:36.757189 [WARNING] fpm_children_bury(), line 215: child 1581 (pool default) exited on signal 15 SIGTERM after 179277.021219 seconds from start
+Feb 05 19:14:36.757240 [WARNING] fpm_children_bury(), line 215: child 1582 (pool default) exited on signal 15 SIGTERM after 179277.020071 seconds from start
+Feb 05 19:14:36.757297 [WARNING] fpm_children_bury(), line 215: child 1583 (pool default) exited on signal 15 SIGTERM after 179277.018923 seconds from start
+Feb 05 19:14:36.757348 [WARNING] fpm_children_bury(), line 215: child 1584 (pool default) exited on signal 15 SIGTERM after 179277.017773 seconds from start
+Feb 05 19:14:36.757400 [WARNING] fpm_children_bury(), line 215: child 1585 (pool default) exited on signal 15 SIGTERM after 179277.016719 seconds from start
+Feb 05 19:14:36.757457 [WARNING] fpm_children_bury(), line 215: child 1586 (pool default) exited on signal 15 SIGTERM after 179277.015592 seconds from start
+Feb 05 19:14:36.757492 [NOTICE] fpm_pctl_exit(), line 81: exiting, bye-bye!
+这个时候，最好的办法是当 php-fpm 停止运行的时候，启动它。
+
+下面是转载的一个是在Nginx 出现 502 Bad Gateway 自动重启 php-fpm 的脚本：
+
+#!/bin/bash
+##
+#Program:check502
+##
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
+export PATH
+# web_URL #
+site=测试网页地址
+# mailto #
+receiver_email="接受邮箱"
+sender_email="发送邮箱"
+recevier="Admin"
+sender="Zeroto"
+# email #
+function run_502(){
+    sendmail -t <<EOF
+From: $sender <$sender_email>
+To: $receiver <$receiver_email>
+Subject: VPS has encountered a 502 error!
+----------------------------------------
+
+The VPS has encountered a 502 error, and it has been handled.
+Congratulations! The VPS runs well now!
+
+----------------------------------------
+EOF
+}
+function restart_error(){
+    sendmail -t <<EOF
+From: $sender <$sender_email>
+To: $receiver <$receiver_email>
+Subject: A terrible error occurred to the VPS.
+----------------------------------------
+
+The VPS has encountered an error, but it failed to restart php-fpm.
+The information has already saved to /home/wwwlogs/502log.log.
+
+----------------------------------------
+EOF
+}
+# test #
+stat=`curl -I $site | head -1 | cut -d ' ' -f2`
+if [ $stat == "502" ]; then
+    service php-fpm restart 2>>/home/wwwlogs/502log.log
+    temp=`echo $?`
+    if [ $temp != "0" ]; then
+        restart_error
+    else
+        run_502
+    fi
+fi
+exit 0
+脚本（转自：http://www.caohuan.com/share-automatic-restart-php-fpm-502.html）是通过curl工具下载“测试网页”的页头，然后提取关键字“ 502”，如果出现502错误的话，则重启httpd服务，并将重启成功与否的状态发一封邮件到邮箱里（只有在出现错误的情况下才发送邮件）。
+
+测试网页必须在同一个服务器上，可以自己创建一个php：
+
+<?php
+echo "This is a test page!";
+?>
+脚本保存成 /home/check502.sh ，并授权 chmod 755 。
+
+添加定时任务，每十分钟检查一次状态并写记录。crontab –l 检查任务添加。
+
+*/10 * * * * (/home/check502.sh >> /home/wwwlogs/502log.log)
+测试效果：
+
+先 service php-fpm stop 然后 top -c 看看是否停掉了 php-fpm
+
+然后执行 /home/check502.sh 后再次 top -c 应该重启了 php-fpm 和发送了邮件到你指定的邮箱了。
+
+这样一来，不但能够随时解决 502 Bad Geteway 的问题，也能够知道问题出现的频率。如果问题出现的次数很多，总是重启也不是办法，就要考虑优化配置或者升级配置的问题了。

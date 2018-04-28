@@ -1,0 +1,50 @@
+通常，ubuntu中卸载软件包时，我们习惯使用以下步骤（用卸载fcitx输入法为例）：
+
+1.sudo apt-get remove  [--purge] fcitx* ;
+
+其中--purge选项，清楚配置文件。
+
+2.sudo apt-get autoremove ;
+
+自动卸载依赖软件包。
+
+3.查询与该包名相关的软件包是否卸载
+
+sudo dpkg --get-selection | grep fcitx;
+
+输出如下：
+
+
+
+
+
+问题出来了，前面第一步已经卸载了fcitx软件包，怎么在这里又出现了，原因是，apt-get remove package 并不会purge相关的软件包，意思是fcitx的相关配置文件还会分散在无关的软件包中，解决办法如下：
+
+dpkg --purge `dpkg --get-selections | grep deinstall | cut -f1`;
+
+还有一种方法是使apt自动purge配置文件，需要更改配置文件/etc/apt/apt.conf：
+
+APT 
+    {
+Get 
+{
+    Purge "true";
+}
+}
+
+这就会使apt-get remove时，自动purge配置文件。
+
+===============================================================================================================================
+
+顺便补充dpkg卸载软件包方法：
+
+1、卸载一个已安装的包裹：
+
+
+Ubuntop:~$ sudo dpkg -r packagename
+
+
+2、完全清除一个已安装的包裹。和 remove 不同的是，remove 只是删掉数据和可执行文件，purge 另外还删除所有的配制文件：
+
+
+Ubuntop:~$ sudo dpkg -P packagename

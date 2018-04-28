@@ -1,0 +1,37 @@
+之前在使用windows server做文件备份的时候，经常使用SyncFolders来实现文件的增量备份。
+现在公司的备份服务器换成centos系统，想要实现增量备份就想到了rsync。但是之前在学习中只使用过rsync -av，无法实现增量备份的需求，无奈之下查阅了一下man。
+在原来的-av的参数的基础上还需添加-u 和 --delete参数
+格式为：
+rsync -auv --delete DTS SRC
+比如，你要将/etc/ 备份到/bakup/中应该这样写
+rsync -auv --delete /etc /bakup/
+
+由于公司的备份机的数据还要定期备份到移动硬盘上，所以我就写了个角本每次运行角本就可以实现移动硬盘的自动挂载、增量备份，自动卸载等工作，并可以根据参数（file/vedio）来决定对哪个文件夹进行备份。代码如下：
+#!/bin/bash
+
+#Bakup /dev/sdb1's files(mounted on /samba/file_server)and /dev/sdc1's files(mounted on /samba/vedio_bakup) to uDisk(mounted on /mnt
+#Author:CMZSteven
+#Create Date:2015-04-18
+
+isMounted=`df|grep /dev/sdd1|wc -l`
+if [ $isMounted == 0 ]; then
+    mount -t ext4 /dev/sdd1 /mnt
+fi
+
+case $1 in
+    "file")
+        rsync -auv --delete /samba/file_server /mnt
+        ;;
+    "vedio")
+        rsync -auv --delete /samba/vedio_bakup /mnt
+        ;;
+    *)
+        echo "The args only in file or veido!"
+
+	;;
+esac
+
+isSuccess=`echo $?`
+if [ $isSuccess == 0 ]; then
+    umount -l /mnt
+fi

@@ -1,0 +1,109 @@
+运维日常工作知识总结
+ 1、  windows系统虚拟机自动安装vmtools
+1
+2
+通过客户端连上esxi：客户机-安装vmtools
+进入系统执行：cmd /k e:&&setup /s/v/qn（e:是光驱盘符）
+2、结束用户会话
+1
+2
+查看谁在登录系统：w
+Linux中踢出其他正在SSH登陆用户的命令：pkill -9 -t pts/3
+3、查看tcp的连接状态和连接数量
+1
+2
+netstat -n|awk '/^tcp/ {++S[$NF]}END {for(a in S) print a,S[a]}'
+/usr/sbin/ss -n|awk '{++S[$1]} END {for(a in S) print S[a],"\t",a}'
+4、分析access.log获得访问前10位的ip地址
+1
+awk '{print $1}' access.log |sort|uniq -c|sort -nr|head -10
+5、实时流量监控
+1
+yum -y install nload
+6、防止日志输出内容太多导致rsyslog丢失日志
+
+echo "$SystemLogRateLimitInterval 60" >> /etc/rsyslog.conf
+echo "$SystemLogRateLimitBurst 3000" >> /etc/rsyslog.conf
+7、删除海量目录命令：
+
+find ./ -type f | xargs -I {} rm -f {}（进入要删除的目录）
+rsync --delete-before -a -H -v --progress --stats /tmp/ ./ （用空目录替换要删除的）
+8、路由跟踪命令：
+1
+mtr 10.10.10.1
+9、ssh连接断开解决办法：
+
+ClientAliveInterval 120
+ClientAliveCountMax 3
+10、提供零时下载：（在10.10.10.10上监听8888）
+
+nc -l 8888 < /root/drbd-8.4.1.tar.gz
+客户端下载：
+wget http://10.10.10.10:8888/drbd-8.4.1.tar.gz
+11、lftp下载实例：
+1
+lftp -c "pget -n 10 -O ./ ftp://test:123456@10.10.10.10:21/kisops_centos6.3_vm_4G.iso"
+12、lftp上传实例：
+1
+lftp -c put /data/apps/kisops_centos6.3_vm_4G.iso -o ftp://test:123456@10.10.10.10:2/kisops_centos6.3_vm_4G.iso
+13、smb客户端挂载命令：
+1
+mount -t cifs -o async,soft,rw,username=ftp,password=123456 //172.28.29.249/Share /sandata/data
+14、在远程机器上运行一段脚本。这条命令最大的好处就是不用把脚本拷到远程机器上：
+1
+ssh user@server bash < /path/to/local/script.sh
+15、测试硬盘的读写速度：
+1
+2
+写：time dd if=/dev/zero of=/usr/mfstest/test2/zhhtest500M  bs=1024k count=500
+读：time dd if=/usr/mfstest/test2/zhhtest500M  of=/dev/null
+16、查看系统SN号：
+1
+dmidecode | grep "Serial Number“
+17、解决复制到linux系统的脚本有字的格式导致错误：
+1
+2
+yum install dos2unix
+dos2unix cactirelease.sh （格式有问题的脚本）
+18、CentOS6系列发邮件并带附件：
+1
+echo "this is a test mail"|mail -s "test" -a /etc/passwd zhaohaijun@kingsoft.com（邮件标题：test，邮件正文：this is a test mail，附件：/etc/下passwd文件
+19、linux系统禁止ping：
+1
+echo 1 > /proc/sys/net/ipv4/icmp_echo_ignore_all
+20、把10.10.10.1-254写入iplist.txt，一行一个的两种写法：
+1
+2
+printf '%s\n' 10.10.10.{1..254} >iplist.txt
+echo 10.10.10.{1..249} | tr ' ' '\n' >> iplist.txt
+21、查看机器有几个CPU：
+1
+cat /proc/cpuinfo | grep physical | uniq -c
+22、加默认路由：
+
+windows：
+route -p add 0.0.0.0 mask 0.0.0.0 162.28.29.32
+linux：
+route add -net 0.0.0.0 netmask 0.0.0.0 gw 162.28.29.32
+23、查看交换机的型号 SN号：
+
+display device manuinfo
+ 24、删除0字节文件：
+ 
+
+find -type f -size 0 -exec rm -rf {} \;
+25、 获取IP地址：
+ 
+
+ifconfig eth0 |grep "inet addr:" |awk '{print $2}'|cut -c 6-
+或者
+ifconfig | grep 'inet addr:'| grep -v '127.0.0.1' | cut -d: -f2 | awk '{ print $1}'
+26、 杀掉80端口相关的进程：
+1
+lsof -i :80|grep -v "ID"|awk '{print "kill -9",$2}'|sh
+27、 清除僵死进程：
+1
+ps -eal | awk '{ if ($2 == "Z") {print $4}}' | kill -9
+ 28、查看文件过滤#开头和有空格行
+1
+cat lvs.cfg | grep -v "#" | awk 'NF'

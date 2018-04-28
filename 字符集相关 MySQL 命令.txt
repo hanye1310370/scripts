@@ -1,0 +1,41 @@
+字符集相关 MySQL 命令
+
+
+show global variables like '%char%';    #查看RDS实例字符集相关参数设置
+
+show global variables like 'coll%';     #查看当前会话字符序相关参数设置
+
+show character set;                     #查看实例支持的字符集
+
+show collation;                         #查看实例支持的字符序
+
+show create table table_name \G         #查看表字符集设置
+
+show create database database_name \G   #查看数据库字符集设置
+
+show create procedure procedure_name \G #查看存储过程字符集设置
+
+show procedure status \G                #查看存储过程字符集设置
+
+alter database db_name default charset utf8;  #修改数据库的字符集
+
+create database db_name character set utf8;   #创建数据库时指定字符集
+
+alter table tab_name default charset utf8 collate utf8_general_ci;   #修改表字符集和字符序
+
+ 使用 sql 语句修改数据库字符集的方法:
+
+语法如下: 
+
+修改库：    
+ALTER DATABASE 库名 CHARACTER SET  字符集名称 COLLATE  排序规则名称;
+修改表:
+ALTER TABLE 表名 CONVERT TO CHARACTER SET 字符集名称  COLLATE  排序规则名称;
+修改一列:
+ALTER TABLE 表名 MODIFY 列名  字段类型 CHARACTER SET  字符集名称  COLLATE 排序规则名称;
+示例: 下面三条sql 分别将库 dbsdq , 表 tt2 , 表 tt2 中的 c2 列修改为utf8mb4 字符集, 代码如下: 
+
+alter database dbsdq character set utf8mb4 collate utf8mb4_unicode_ci;
+use dbsdq;
+alter table tt2 character set utf8mb4 collate utf8mb4_unicode_ci;
+alter table tt2 modify c2  varchar(10) character set utf8mb4;

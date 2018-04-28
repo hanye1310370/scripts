@@ -1,0 +1,70 @@
+yinjianbin@5ifangxin.com
+Yinjianbin123456
+QQ:191759928
+
+user:fx_test
+passwd:fx_test123
+fx_test12300.
+http://gitlab.1fangxin.cn
+yinjianbin/fangxin12345
+
+git config --global user.name"yinjianbin"
+git config --global user.email "yinjianbin122@163.com"
+ssh-keygen -t rsa -C "yinjianbin122@163.com"
+
+
+106.14.71.210(数据中心）mysql 账号：
+user:root
+passwd:@fx$5!me$
+ show crete database web_common ;
+ CREATE DATABASE `web_common` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci */
+ 
+  CREATE DATABASE `web_common` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci；
+
+create table travelrecord (id bigint not null primary key,user_id varchar(100),traveldate DATE, fee decimal,days int);
+
+
+mysql -uzz-fx-com -p1vCEclfJeuoqlkKN -hrds-1fangxin.mysql.rds.aliyuncs.com
+
+
+
+本机环境：
+http://qa1-member.fx.com/?lid=910
+
+正式环境：
+http://zz.1fangxin.net/?zlid=910
+
+测试环境访问地址：
+http://qa.1fangxin.cn/?lid=910
+mysqldump -h rds-1fangxin.mysql.rds.aliyuncs.com -u zz-fx-com -p1vCEclfJeuoqlkKN --default-character-set=utf8 --net_buffer_length=10240 --no-create-db --skip-add-locks --skip-tz-utc --set-charset zz-fx-com >/home/zz.sql
+
+
+DB_CONNECTION=mysql
+DB_HOST=drdsgpqp6bbv9652.drds.aliyuncs.com
+DB_PORT=3306
+DB_DATABASE=fangxin_erp
+DB_USERNAME=fangxin_erp
+DB_PASSWORD=Fang2_xin0_Cloud16
+
+
+删除文件中含有某个字符串的行：
+sed -i '/-/d' youfilename.log
+sed -i  '/Table structure/d' zz-fx-com_-_副本.sql |grep -i "Table structure"
+删除文件中含特定字符串的行[bash]:
+ 
+sed -e '/abc/d'  a.txt   // 删除a.txt中含"abc"的行，但不改变a.txt文件本身，操作之后的结果在终端显示
+ 
+sed -e '/abc/d'  a.txt  > a.log   // 删除a.txt中含"abc"的行，将操作之后的结果保存到a.log
+ 
+sed '/abc/d;/efg/d' a.txt > a.log    // 删除含字符串"abc"或“efg"的行，将结果保存到a.log
+ 
+其中，"abc"也可以用正则表达式来代替。
+ 
+阿里云账号：
+yinjiabin122
+10as.111
+
+[root@centos dnmp]# cat /etc/docker/daemon.json 
+{
+"registry-mirrors": ["https://pf16ukja.mirror.aliyuncs.com"]
+}

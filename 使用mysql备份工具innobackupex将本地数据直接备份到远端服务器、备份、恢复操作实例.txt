@@ -1,0 +1,194 @@
+innobackupex 支持所有mysql引擎数据备份恢复安装配置方法及原理介绍，访问下面链接
+http://michaelkang.blog.51cto.com/1553154/1216826
+测试环境介绍：
+
+#mysql数据目录
+/data/3306/data
+
+#备份文件存放目录
+/data/3306/backup
+
+#mysql配置文件位置
+/data/3306/my.cnf
+
+#备份前首先所需要建立一个备份所需的目录
+mkdir -p /data/3306/backup
+
+mysql 版本 ：
+[root@slave2 3306]# mysql -V
+mysql  Ver 14.14 Distrib 5.5.25, for Linux (x86_64) using  EditLine wrapper
+
+系统版本：
+more /etc/redhat-release
+CentOS release 6.2 (Final)
+
+内核版本：
+[root@slave2 3306]# uname -a
+Linux slave2 2.6.32-220.el6.x86_64 #1 SMP Tue Dec 6 19:48:22 GMT 2011 x86_64 x86_64 x86_64 GNU/Linux
+
+
+本地IP：92.168.1.199
+远端服务器IP：192.168.1.200
+系统环境同“4.1测试环境介绍”
+
+目的：备份当前机器下的数据到192.168.1.200的/data/3306/backup/目录下，进行数据恢复启动。（建立主从同步时使用）
+
+step：1
+查看本地数据库
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| ptmind             |
+| ptmind_common      |
++--------------------+
+5 rows in set (0.29 sec)
+
+mysql> use ptmind_common;
+Database changed
+mysql> show tables;
++------------------------------------+
+| Tables_in_ptmind_common            |
++------------------------------------+
+| dtl_full_pv_detail                 |
+中间省略|
+| tst_pn_detail                      |
+| tst_pv_detail                      |
++------------------------------------+
+60 rows in set (0.00 sec)
+
+step:2
+我为了方便做了证书，导入到了对端服务器，另外发现如果两台服务器不做无密码认证，从本地往远端服务器无法备份。
+
+证书生成及导入到对端服务器操作如下：
+ssh-keygen
+ssh-copy-id root@192.168.1.200
+
+step：3
+备份当前机器下的所有数据到192.168.1.200的/data/3306/backup/目录下
+
+备份命令1
+innobackupex --user=root --defaults-file=/data/3306/my.cnf --stream=tar /data/3306/data | ssh root@192.168.1.200 cat ">" /data/3306/backup/test.tar
+
+备份命令2
+innobackupex --user=root --defaults-file=/data/3306/my.cnf --stream=tar /data/3306/data|ssh root@192.168.1.200 cat ">"/data/3306/backup/mysqlbackup$(date +%Y-%m-%d_%H_%M_%S).tar
+
+
+参数解释：
+–stream=tar : 告诉xtrabackup，备份需要以tar的文件流方式输出。
+
+--no-lock的选项说明：
+       Use this option to disable table lock with "FLUSH TABLES WITH READ
+       LOCK". Use it only if ALL your tables are InnoDB and you DO NOT CARE
+       about the binary log position of the backup.
+no-lock 参数用于指定备份时不锁定表。
+
+--database：可以指定要备份的库   --database="ptmind_common kk"
+建议使用2组参数，在远端机器生成的文件名按日期命名，mysqlbackup2013-06-04_15_30_50.tar
+
+step:4
+
+核实备份文件：
+远端服务器生成备份文件；
+[root@slave2 backup]# du -sh *
+1.5G    mysqlbackup2013-06-04_16_23_23.tar
+
+在本地生成一个全备文件，对比两边生成全备文件大小是否一至。
+innobackupex --defaults-file=/data/3306/my.cnf  --user=root /data/3306/backup/
+[root@slave1 backup]# du -sh *
+1.5G    2013-06-04_16-36-03
+
+经对比发现本地和远端生成备份文件大小一致，
+
+
+本地备份文件内容如下：
+[root@slave1 backup]# ll 2013-06-04_16-36-03/
+total 1534520
+-rw-r--r-- 1 root root        262 Jun  4 16:36 backup-my.cnf
+-rw-r----- 1 root root 1570766848 Jun  4 16:36 ibdata1
+drwxr-xr-x 2 root root       4096 Jun  4 16:38 mysql
+drwxr-xr-x 2 root root       4096 Jun  4 16:37 performance_schema
+drwxr-xr-x 2 root root       4096 Jun  4 16:37 ptmind
+drwxr-xr-x 2 root root     540672 Jun  4 16:37 ptmind_common
+-rw-r--r-- 1 root root         13 Jun  4 16:38 xtrabackup_binary
+-rw-r--r-- 1 root root         23 Jun  4 16:36 xtrabackup_binlog_info
+-rw-r----- 1 root root         95 Jun  4 16:38 xtrabackup_checkpoints
+-rw-r----- 1 root root       2560 Jun  4 16:38 xtrabackup_logfile
+
+解压远端服务器备份文件，查看内容如下：
+注：解压需要手动进行，并且需要加入-i 参数，否则无法解压出所有文件 ，（-i, --ignore-zeros                 忽略归档中的零字节块(即文件结尾)）
+[root@slave2 backup]# tar -ixvf mysqlbackup2013-06-04_16_23_23.tar  
+backup-my.cnf
+ibdata1
+xtrabackup_logfile
+xtrabackup_checkpoints
+xtrabackup_binary
+
+查看远端解压完成的数据，进行对比和本地备份的文件一致
+[root@slave2 backup]# ll
+total 3121060
+-rw-r--r-- 1 root root        262 Jun  4 16:54 backup-my.cnf
+-rw-rw---- 1 root root 1570766848 Jun  4 01:35 ibdata1
+drwxr-xr-x 2 root root       4096 Jun  4 17:01 mysql
+drwxr-xr-x 2 root root       4096 Jun  4 17:01 performance_schema
+drwxr-xr-x 2 root root       4096 Jun  4 17:01 ptmind
+drwxr-xr-x 2 root root     393216 Jun  4 17:01 ptmind_common
+-rw-r--r-- 1 root root         13 Jun  4 16:57 xtrabackup_binary
+-rw-r--r-- 1 root root         23 Jun  4 16:56 xtrabackup_binlog_info
+-rw-rw---- 1 root root         95 Jun  4 16:57 xtrabackup_checkpoints
+-rw-rw---- 1 root root       2560 Jun  4 16:57 xtrabackup_logfile
+
+
+step：7
+删除远端/data/下文件夹，模拟数据丢失；
+
+rm -rf /data/3306/data/*
+
+step：8
+首先全备恢复
+innobackupex --defaults-file=/data/3306/my.cnf --user=root --apply-log --redo-only /data/3306/backup/
+
+step: 9
+copy备份数据文件到原来数据位置
+
+innobackupex-1.5.1 --defaults-file=/data/3306/my.cnf --user=root --copy-back /data/3306/backup/
+
+step：10
+修改数据文件权限为mysql
+
+chown mysql.mysql -R data
+
+[root@slave2 3306]# /etc/init.d/mysqld start  
+Starting MySQL................. SUCCESS!
+
+step：11
+查看验证本地数据库
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| ptmind             |
+| ptmind_common      |
++--------------------+
+5 rows in set (0.29 sec)
+
+mysql> use ptmind_common;
+Database changed
+mysql> show tables;
++------------------------------------+
+| Tables_in_ptmind_common            |
++------------------------------------+
+| dtl_full_pv_detail                 |
+中间省略|
+| tst_pn_detail                      |
+| tst_pv_detail                      |
++------------------------------------+
+60 rows in set (0.00 sec)
+
+ok，经过以上步骤顺利完成了使用innobackupex备份工具将本地数据备份到远端服务器并进行数据恢复的过程；

@@ -1,0 +1,18 @@
+<h2>(本邮件是程序自动下发的，请勿回复！)<h2><br/>
+<h2>端访问地址：< a href=" ">http://qa.1fangxin.cn</ a><h2><br/>
+<h2>帐号：<h2><br/>
+<h2>密码：<h2><br/>
+${JELLY_SCRIPT,template="html"}<br/><hr/>
+
+
+
+
+jenkins_da="/home/jenkins/ops/workspace/test_QA"
+erp_da="/home/ops/erp/qa"
+cd $erp_da
+cp ${jenkins_da}/* ${erp_da} -fr
+#sh /home/qa/erp_qa.sh
+composer install
+/home/ops/erp/qa/node_modules/.bin/gulp
+/usr/local/php/bin/php artisan migrate --force
+/usr/local/php/bin/php  artisan queue:restart 

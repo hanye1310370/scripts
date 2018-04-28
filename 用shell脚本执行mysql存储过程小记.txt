@@ -1,0 +1,13 @@
+用shell脚本执行mysql存储过程小记
+#!/bin/bash
+
+HOSTNAME="127.0.0.1"        #数据库信息
+PORT="3306"
+USERNAME="root"
+PASSWORD="pwd"
+DBNAME="dbname"
+
+execSql="call procedureName(DATE_FORMAT(NOW(),'%Y-%m-%d'))"
+echo  "Begin  execute procedure."
+mysql -h${HOSTNAME}   -P${PORT}   -u${USERNAME} -p${PASSWORD} ${DBNAME} -e "${execSql}"
+echo  "End execute procedure."

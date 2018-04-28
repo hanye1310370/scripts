@@ -1,0 +1,310 @@
+日志管理
+系统和程序的日记本
+记录系统,程序运行中发生的各种事件
+通过查看日志,了解及排除故障
+信息安全控制的依据 
+内核及系统日志
+由系统服务rsyslog统一记录/管理
+日志消息采用文本格式
+主要记录事件发生的时间,主机,进程,内容
+常见的日志文件
+
+/var/log/messages       记录内核消息,各种服务的公共消息
+/var/log/dmesg      记录系统启动过程的各种消息
+/var/log/cron       记录与cron计划任务相关的消息
+/var/log/maillog        记录邮件收发相关的消息
+/var/log/secure     记录与访问限制相关的安全消息
+用户日志
+由登录程序负责记录/管理
+日志消息采用二进制格式
+记录登录用户的时间,来源,执行的命令等信息
+
+/var/log/lastlog        记录最近的用户登陆事件
+/var/log/wtmp       记录成功的用户登录/注销事件
+/var/log/btmp       记录失败的用户登录事件
+/var/log/utmp       记录当前登录的每个用户的相关信息
+查看文本日志消息
+通过分析工具
+tail,tailf,less,grep等文本浏览/检索命令
+tailf = tail -f (实时跟踪)
+awk,sed 等格式化过滤工具
+专用分析工具
+Webmin系统管理套件
+Webalizer AWStats 等日志统计套件
+用户登录分析
+user who w 命令
+查看已登录的用户信息,详细度不同
+last lastb 命令
+查看最近登录成功/失败的用户信息
+
+[root@svr7 ~]# users
+ root root root
+[root@svr7 ~]# who
+ root     tty1         2017-11-13 02:36
+ root     pts/0        2017-11-13 01:31 (192.168.4.254)
+ root     pts/1        2017-11-13 02:29 (192.168.4.254)
+pts/n  指的是 伪字符终端
+ttyn     指的是 纯字符终端  
+[root@svr7 ~]# who | wc -l  #查看当前登录用户数量
+ 3
+[root@svr7 ~]# w
+    02:36:41 up  6:24,  3 users,  load average: 0.00, 0.01, 0.05
+ USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT
+ root     tty1                      02:36   17.00s  0.02s  0.02s -bash
+ root     pts/0    192.168.4.254    01:31    7:13   0.07s  0.00s tailf /opt/123.
+ root     pts/1    192.168.4.254    02:29    1.00s  0.07s  0.02s w
+ wtmp begins Thu Jan  5 11:47:19 2017
+[root@svr7 ~]# last -2
+ root     tty1                          Mon Nov 13 02:36   still logged in   
+ root     tty1                          Mon Nov 13 02:36 - 02:36  (00:00)
+ wtmp begins Thu Jan  5 11:47:19 2017
+[root@svr7 ~]# lastb -2
+ lisi     tty1                          Mon Nov 13 02:36 - 02:36  (00:00)    
+ root     ssh:notty    192.168.4.254    Fri Nov 10 03:50 - 03:50  (00:00)    
+ btmp begins Thu Jan  5 11:48:25 2017
+日志消息的优先级
+Linux内核定义的事件紧急程度
+分为0~7共8种优先级别
+其数值越小,表示对应事件越紧急
+0 EMERG （紧急） 会导致主机系统不可用的情况
+1 ALERT （警告） 必须马上采取措施解决的问题
+2 CRIT （严重） 比较严重的情况
+3 ERR （错误） 运行出现错误
+4 WARNING（提醒） 可能会影响系统功能的事件
+5 NOTICE （注意） 不会影响系统但值得注意
+6 INFO （信息） 一般信息
+7 DEBUG （调试） 程序或系统调试信息等
+8 NONE 不需要登录
+debug 与 none 两个 当我们想要做一些错误检测或者忽略掉某些服务的信息时用这两个
+4级别以上是比较重要的
+#记录日志文件的服务的配置文件
+
+vim /etc/rsyslog.conf 
+#kern.*                                                 /dev/console
+只要是内核产生的信息，全都送到console(终端机)去 console通常是由外部设备连接到系统来
+这个通常的应用是在系统出现严重问题而无法使用默认的屏幕查看时，可以使用这个选项来连接取得内核信息
+*.info;mail.none;authpriv.none;cron.none                /var/log/messages
+mail news authpriv cron 等类型生成的信息较多 除此之外的其他信息都写入 /var/log/messages 中
+authpriv.*                                              /var/log/secure
+认证方面的信息均写入 /var/log/secure
+mail.*                                                  -/var/log/maillog
+邮件方面的信息则写入 /var/log/maillog 
+cron.*                                                  /var/log/cron
+周期性工作调度均写入 /var/log/cron
+*.emerg                                                 :omusrmsg:*
+当产生最严重的错误等级时，将该等级的信息以wall的方式广播给所有系统登录的帐号
+uucp,news.crit                                          /var/log/spooler
+当新闻组方面的信息有严重错误就写入   /var/log/spooler
+local7.*                                                /var/log/boot.log
+开机时应该显示到屏幕的信息写入到 /var/log/boot.log  
+链接符号代表的意思
+"." 代表比后面还要高的等级（含该等级）例如mail.info 代表只要是mail的信息，而且信息等级高于info(含info本身)时，就被记录
+".=" 代表所需等级就是后面的等级而已，其他的不要
+".!" 代表不等于，即除了该等级外的其他等级都记录
+
+常见的放置位置:
+文件的绝对路径，通常放在/var/log/里
+打印机或其他设备 例如/dev/lp0这个打印机设备
+用户名称：显示给用户
+远程主机：例如@www.test.test 要对方主机支持
+*: 代表目前在线的所有人
+
+自定义日志（以ssh为例）
+1）修改ssh服务日志级别
+vim /etc/ssh/sshd_config,搜索SyslogFacility,查出默认情况ssh日志级别为认证级别，此处将其修改为local0
+
+[root@room1pc32 桌面]# vim /etc/ssh/sshd_config 
+#SyslogFacility AUTH
+#SyslogFacility AUTHPRIV
+SyslogFacility local0
+2）修改系统日志配置
+
+[root@room1pc32 桌面]# vim /etc/rsyslog.conf 
+local0.*                                                /var/log/sshtest.log
+3）重启服务
+
+[root@room1pc32 桌面]# systemctl restart rsyslog.service 
+[root@room1pc32 桌面]# systemctl restart sshd
+4)测试
+
+echo > /var/log/sshtest.log     #清空日志文件 没有此文件时 会自动生成日志文件
+使用另一台机器ssh 此服务器
+查看 /var/log/sshtest.log的信息
+    注意 日志文件如果编辑过 就无法记录了 要从新启动日志文件服务 所以用vim 查看的时后 不要用：wq 用：q 就好了
+远程日志服务器
+可以使用tcp 和 udp 传输 这里使用的是tcp
+日志服务器端：172.40.51.132
+发送日志端：172.40.51.131
+在 172.40.51.132 上
+取消如下两行信息注释
+
+[root@room1pc32 桌面]# vim /etc/rsyslog.conf 
+$ModLoad imtcp
+$InputTCPServerRun 514
+重启系统日志服务
+
+[root@room1pc32 桌面]# systemctl restart rsyslog.service
+检查514端口
+
+[root@room1pc32 桌面]# netstat -pantu | grep 514
+tcp        0      0 0.0.0.0:514             0.0.0.0:*               LISTEN      29338/rsyslogd      
+tcp6       0      0 :::514                  :::*                    LISTEN      29338/rsyslogd 
+在 172.40.51.131 上
+最后一行添加
+
+[root@room1pc31 桌面]# vim /etc/rsyslog.conf 
+*.* @@172.40.51.132:514
+重启系统日志服务
+
+[root@room1pc31 桌面]# systemctl restart rsyslog.service
+测试 在172.40.51.131 上操作
+
+[root@room1pc31 桌面]# systemctl restart vsftpd
+在172.40.51.131 上查看日志
+
+[root@room1pc32 桌面]# grep 'pc31' /var/log/messages
+Dec  8 14:55:01 room1pc31 systemd: Started Vsftpd ftp daemon.
+日志回滚
+weekly #每周对日志文件进行一次rotate工作 
+rotate 4 #保留四个历史日志文件
+create #由于日志文件被重命名 所以新建一个空的文件继续存储
+dateext #归档老版本日志文件添加一个日期
+
+include /etc/logrotate.d    #将/etc/logrotate.d/这个目录中的所有文件都执行rotate的工作
+/var/log/wtmp {         #针对/var/log/wtmp 所设置的参数
+        monthly             #每月一次
+        create 0664 root utmp   #新建文件的权限与属主 属组
+                minsize 1M      #文件容量超过1MB后才执行（略过时间参数）
+        rotate 1            #仅保留一个历史日志文件
+}
+/var/log/btmp {
+        missingok           #文件丢失不报错
+        monthly
+        create 0600 root utmp
+        rotate 1
+}
+logrotate的写法：
+文件名：被处理的日志文件的绝对路径
+参数：上述文件名进行轮替的参数 用{}包括起来
+参数可以调用外部命令执行
+执行环境
+sharedscripts
+... 
+endscript
+prerotate:在启动logrotate之前进行
+postrotate：在做完logrotate之后启动的命令
+syslog服务如何设置rotate
+
+[root@room1pc32 桌面]# vim /etc/logrotate.d/syslog 
+/var/log/cron
+/var/log/maillog
+/var/log/messages
+/var/log/secure
+/var/log/spooler
+{
+        missingok
+        sharedscripts
+        postrotate
+                /bin/kill -HUP `cat /var/run/syslogd.pid 2> /dev/null` 2> /dev/null || true
+        endscript
+}
+对五个日志文件进行轮替，轮替完毕后 取得syslog 的PID后 以kill-HUP重新启动
+如果日志文件增加了chattr +a 的属性时
+可以在参数中添加如下操作
+
+        sharedscripts
+        prerotate
+                /usr/bin/chattr -a 文件名
+        endscript
+        sharedscripts
+        postrotate
+                /bin/kill -HUP `cat /var/run/syslogd.pid 2> /dev/null` 2> /dev/null || true
+        /usr/bin/chattr +a 文件名
+        endscript
+实际测试 logrotate 的操作
+logrotate [-vf] logfile
+-v : 启动显示模式，会显示logrotate运行的过程
+-f : 不符合配置文件数据，强制每个日志文件都进行rotate的操作
+
+在ssh日志的基础上 做日志回滚
+1）编辑配置文件
+
+[root@room1pc31 桌面]# cd /etc/logrotate.d/
+[root@room1pc31 logrotate.d]# vim sshd
+/var/log/sshtest.log{
+missingok
+weekly
+create 0600root root
+minsize 1M
+rotate 3
+}
+2）重启日志服务
+
+[root@room1pc31 logrotate.d]# systemctl restart rsyslog.service 
+3）预演执行轮询
+
+[root@room1pc31 logrotate.d]# logrotate -d /etc/logrotate.d/sshd 
+reading config file /etc/logrotate.d/sshd
+Handling 1 logs
+rotating pattern: /var/log/sshtest.log weekly (3 rotations)
+empty log files are rotated, only log files >= 1048576 bytes are rotated, old logs are removed
+considering log /var/log/sshtest.log
+    log does not need rotating
+[root@room1pc31 logrotate.d]# echo $?
+0
+4) 强制轮询 也就是说轮询条件没满足
+
+[root@room1pc31 logrotate.d]# logrotate -vf /etc/logrotate.d/sshd 
+...
+[root@room1pc31 logrotate.d]# echo $?
+0
+5）查看ssh日志
+
+[root@room1pc31 logrotate.d]# ls /var/log/sshtest.log
+sshtest.log    sshtest.log.1 
+[root@room1pc31 log]# du -sh sshtest.log
+0   sshtest.log
+[root@room1pc31 log]# du -sh sshtest.log.1
+4.0K    sshtest.log.1
+6）logrotate日志查看
+
+[root@room1pc31 log]# cd /var/lib/
+[root@room1pc31 lib]# grep '2017-12-8' logrotate.status 
+"/var/log/sshtest.log" 2017-12-8-16:50:7
+logrotate的执行由crond服务实现 在/etc/cron.daily目录中
+
+[root@room1pc32 桌面]# vim /etc/cron.daily/logrotate 
+#!/bin/sh
+
+/usr/sbin/logrotate /etc/logrotate.conf
+EXITVALUE=$?
+if [ $EXITVALUE != 0 ]; then
+        /usr/bin/logger -t logrotate "ALERT exited abnormally with [$EXITVALUE]"
+fi
+exit 0
+扩展
+保护日志文件措施
+设置文件的隐藏属性
+chattr [-RV][+-=AacDdijsSu][-v]文件或目录
+-R 递归
+
+失效属性
+激活属性
+a 系统只允许在这个文件之后追加数据，不允许任何进程覆盖或截断这个文件，目录就只可以在目录下建立和修改，而不允许删除
+i 系统不允许对这个文件进行任何修改，目录 目录下的文件不允许建立和删除文件
+查看文件的隐藏属性
+lsattr [-adR] 文件目录
+使用journalctl工具 (只有Linux7 )
+提取由systemd-journal服务搜集的日志
+主要包括内核/系统日志,服务日志
+常见用法
+journalctl | grep 关键词
+journalctl -u 服务名 [ -P 优先级 ]
+journalctl -n 消息条数
+journalctl --since='yyyy-mm-dd HH:MM:SS' --until="yyyy-mm-dd HH:MM:SS"
+
+[root@svr7 /]# journalctl  --since="9:00"   --until="9:30" 
+[root@svr7 /]# yum -y install httpd
+[root@svr7 /]# systemctl restart  httpd
+[root@svr7 /]# journalctl  -u  httpd   
+[root@svr7 /]# journalctl  -n  10

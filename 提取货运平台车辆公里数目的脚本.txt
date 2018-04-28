@@ -1,0 +1,82 @@
+#!/bin/bash
+DIR=21
+cd $DIR
+for i in $(echo * )
+do
+echo   ${i%%.*}  $(tail   -1 $i |cut -d : -f 12) >> /data/07.txt
+#或者
+#echo   $(basename $i .txt)  $(tail   -1 $i |cut -d : -f 12) >> /data/07.txt
+done
+sed -i 's/2_//g' /data/07.txt
+#删除非黄色车辆
+forward=`grep -n 1_豫  /data/07.txt |head -1|cut -d : -f1`
+backend=`grep -n 1_豫  /data/07.txt |tail -1|cut -d : -f1`
+sed -i "$forward,$backend d" /data/07.txt
+forward2=`grep -n 4_豫  /data/07.txt |head -1|cut -d : -f1`
+backend2=`grep -n 4_豫  /data/07.txt |tail -1|cut -d : -f1`
+sed -i "$forward2,$backend2 d" /data/07.txt
+forward1=`grep -n 3_豫  /data/07.txt |head -1|cut -d : -f1`
+backend1=`grep -n 3_豫  /data/07.txt |tail -1|cut -d : -f1`
+sed -i "$forward1,$backend1 d" /data/07.txt
+forward3=`grep -n 9_豫  /data/07.txt |head -1|cut -d : -f1`
+backend3=`grep -n 9_豫  /data/07.txt |tail -1|cut -d : -f1`
+sed -i "$forward3,$backend3 d" /data/07.txt
+awk 'NR==FNR{a[$1]=$0}NR>FNR{print a[$1],$2}' 06.txt  07.txt  >>   all.text  #现在想在linux中比较这两个文件的开头，第一列相同的话，就把test1中对应行输出到test3里面，并且附上test2中第二列内容。
+sed -i "/^ /d" all.text   #删除以空格开头的行
+awk '{print $0,$3-$2}' all.text >> OK.txt
+                                                  
+
+#用单引号会显示找不到命令，用双引号能少弯路   
+#sed中引用 shell 变量 要用 sed -e  " command  " (双引号 )                                  
+
+
+
+
+
+
+
+
+
+
+注：在文件每行末尾添加字符串
+1. sed  -i "s/$/.log/g" nihao.txt 
+[root@jgpta logs]# sed  "s/$/.log/g" nihao.txt 
+catalina.2015-07-29.log
+catalina.log
+file.log
+localhost.2015-07-29.log
+nihao.log
+rm.log
+rm.sh.log
+2. [root@jgpta logs]# sed  "s/.*/.log/" nihao.txt
+.log
+.log
+.log
+.log
+.log
+.log
+.log
+
+3. awk '{print $0,"xxxx"}' file
+[root@jgpta logs]# awk '{print $0,".log"}' nihao.txt
+catalina.2015-07-29 .log
+catalina .log
+file .log
+localhost.2015-07-29 .log
+nihao .log
+rm .log
+rm.sh .log
+[root@jgpta logs]# awk '{print $0,".log"}' nihao.txt > big.txt
+[root@jgpta logs]# cat big.txt 
+catalina.2015-07-29 .log
+catalina .log
+file .log
+localhost.2015-07-29 .log
+nihao .log
+rm .log
+rm.sh .log
+4. [root@bogon ~]# cat nihao.txt | awk 'BEGIN{ORS=".log\n"}{print $1}'
+a.log
+b.log
+c.log
+[root@
