@@ -1,0 +1,423 @@
+Linux处理文本文件的工具：
+	grep	过滤文件内容
+	sed		编辑文件内容
+	awk
+	
+		正则表达式Regex
+
+
+正则表达式Regex
+
+1)	匹配单个字符的元字符 
+	
+	.
+	
+	[abc]	[a-z]	[A-Z]	[0-9]	[a-zA-Z0-9]		[^a-z]
+	
+	[[:alpha:]]		[[:upper:]]		[[:lower:]]		[[:digit:]]		[[:alnum:]]		[[:space:]]		[[:punct:]]
+		
+2) 匹配字符出现的位置
+	
+	^str 	str$	^$
+
+3)	匹配字符出现的次数
+
+	*	\?		\+		\{3\}		\{2,5\}		\{2,\}
+
+	分组：\(abc\)\{2\}
+	
+	
+	.*
+
+
+	
+	
+sed: Stream Editor 流编辑器 
+
+	行编辑器 逐行编辑
+	
+将每行内容读入到内存中，在内存中进行处理，将结果返回给屏幕 ，此段内存空间称为模式空间
+
+默认不编辑原文件，仅对模式空间的数据进行处理，处理结束后，将模式空间的内容显示到屏幕 
+
+
+sed命令的使用格式
+
+# sed [option] scripts file1 file2 ...
+
+# sed [option] 'AddressCommand' file1 file2 ...
+
+	Address:表示对哪些行进行处理
+	Command：操作命令
+	
+	
+	option选项：
+		-n：不再显示模式空间中的内容(默认显示)
+		-i: 直接修改原文件
+		-e 'AddressCommand' -e 'AddressCommand'：同时执行多个匹配操作
+			[root@shell ~]# sed -e '/^#/d' -e '/^$/d' /etc/fstab 
+
+		-f FILE	将多个AddressCommand保存至文件中，每行一个AddressCommand；读取该文件中的操作同时执行多个操作 
+		
+			[root@shell ~]# cat /tmp/1.txt 
+				/^#/d
+				/^$/d
+			[root@shell ~]# sed -f /tmp/1.txt /etc/fstab 
+
+		
+		-r：表示使用扩展正则表达式   
+		
+			[root@shell ~]# sed -r  's|l(..e)|L\1|' /tmp/1.txt
+
+			
+		--follow-symlinks     修改软链接文件时 
+		 
+		[root@shell ~]# sed --follow-symlinks -i 's|hello|hi|' /tmp/2.txt 
+
+
+				
+			
+			
+	
+Address表示方法：
+
+1、StartLine,EndLine 
+	1,100
+	1,$
+	3,10
+	
+2、LineNumber
+	3 
+
+3、StartLine,+n 
+	
+	5,+2 				/root/,+2
+
+4、/正则表达式/
+
+	/root/
+	/bash$/
+
+5、 /正则表达式1/, /正则表达式2/
+
+	第1次被Regex1匹配的行开始，到第1次被Regex2匹配的行中间的所有行
+	
+
+
+	
+Command：
+
+d  删除符合条件的行
+  # sed '1,2d' /etc/inittab 
+	
+  删除文件中包含oot的行
+  # sed '/oot/d' /etc/fstab 
+	
+  删除第1行及其后2行
+  # sed '1,+2d' /etc/fstab 
+	
+  删除第1行
+  # sed '1d' /etc/fstab 
+  
+  删除以/开头的行
+  # sed '/^\//d' /etc/fstab 
+	
+p 显示符合条件的行
+  显示以/开头的行 
+  # sed -n '/^\//p' /etc/fstab 
+  
+a \string	在符合条件的行后追加新行，string为追加的内容
+  在以/开头的行后面追加# hello world 
+  # sed '/^\//a \# hello world' /etc/fstab 
+  
+  在以/开头的行后面追加两行内容，分别为# hello worl  # hello linux 
+  # sed '/^\//a \# hello world\n# hello linux' /etc/fstab 
+	
+i \string	在符合条件的行前添加新行，string为追加的内容
+   在文件第1行添加# hello world 
+   # sed '1i \# hello world' /etc/fstab 
+
+c \string 	替换指定行的内容
+   将文件中最后一行内容替换为End Of File
+   # sed '$c \End Of File' /1.txt 
+   
+   # sed '7c \SELINUX=disabled' /etc/sysconfig/selinux 
+
+ 
+ 
+=	用于显示每一行的行号
+	显示/etc/passwd文件最后一行的行号
+	# sed -n '$=' /etc/passwd
+	49
+   
+r file_name		将指定文件的内容添加到符合条件的行的后面
+   在文件的第2行后追加/etc/issue文件的内容 
+   # sed '2r /etc/issue' /etc/fstab 
+   
+w file_name		将符合条件的内容另存到指定文件中
+   将以UUID开头的行另存为到/1.txt中
+   # sed '/^UUID/w /1.txt' /etc/fstab 
+   
+
+  
+s/regex/string/[修饰符]		查找并替换			默认情况下，只替换每一行第1次出现的字符
+   修饰符：
+	g：替换每一行所有的字符
+	i：忽略大小写
+	
+[root@localhost ~]# sed 's/^#/?/' /etc/fstab 
+
+
+   查找文件中的UUID，并替换为uuid
+   # sed 's/UUID/uuid/' /etc/fstab 
+   
+   将行首的/替换成#
+   # sed 's/^\//#/' /etc/fstab 
+   
+   [root@localhost ~]# sed 's|/|#|g' /etc/fstab 
+
+   
+   将每一行出现的所有/替换为@
+   # sed 's/\//@/g' /etc/fstab 
+   
+   反向引用 \(\)   \1  \2 
+   
+   将文件中以l..e替换为l..er，例如love替换为lover
+   # sed 's/\(l..e\)/\1r/g' /etc/fstab 
+   或
+   # sed 's/l..e/&r/g' /etc/fstab 
+   &：引用正则表达式匹配的所有字符串
+   
+   将文件中l..e的单词替换为L..e，例如love替换为Love
+   # sed 's/l\(..e\)/L\1/' /1.txt 
+ 
+   删除行首的空格
+   [root@shellscript ~]# sed 's|^#||' /etc/fstab 
+   [root@wechat ~]# sed  -i 's|^ ||' test.txt
+   [root@shellscript ~]# history | sed 's|^[[:space:]]\+||'
+
+ 
+sed示例：
+
+1、删除/etc/grub2.cfg文件中行首的空白字符
+
+2、将/etc/fstab文件中的数字5替换为数字3
+
+3、删除/etc/fstab文件中的空白行
+
+4、删除/etc/inittab文件中开头的#号
+
+5、删除某文件中开头的#号，但要求#号后面必须有空白字符
+
+6、删除某文件中以空白字符后面跟#号的行中的开头的空白字符及#
+
+
+系统初始化脚本：
+   1) 配置固定IP
+   2) 关闭SEinux及防火墙
+   3) yum源 
+   4) 关闭SSH DNS解析及GSSAPI认证
+   5) 172.16.8.100同步时间
+   6) 设置主机名 
+
+
+
+   
+   
+   
+   
+   
+   
+
+shell脚本中对字符串的处理				
+
+1、${#变量名}
+
+作用：返回字符串的长度
+# foo="this is a test"
+# echo ${#foo}           //返回字符串foo的长度          
+14
+
+
+2、${变量名:offset:length}
+
+作用：截取字符串，length指定截取的长度，也可以不写；字符串的第一个字符的索引值为0
+# foo="abcdefg"
+# echo ${foo:3:2}     //从下标为3的字符开始截取，共截取2个     
+de
+# echo ${foo:3}       //从下标为3的字符开始截取到最后的字符     
+defg
+
+
+
+3、${变量名#pattern}    ${变量名##parttern}
+
+pattern：模式，通配符表达式
+作用：清除字符串中符合pattern的字符
+
+# foo="file.txt.zip"
+# echo ${foo#*.}          //一个#号代表按照最短匹配清除
+txt.zip
+# echo ${foo##*.}         //2个#号代表按照最长匹配清除
+zip
+
+4、${变量名%pattern}    ${变量名%%parttern}
+pattern：模式，通配符表达式
+作用：清除字符串中符合pattern的字符，从字符串最后匹配
+# echo $foo
+file.txt.zip
+# echo ${foo%.*}              //1个%代表按照最短匹配
+file.txt
+# echo ${foo%%.*}           //2个%%代表按照最长匹配
+file
+
+
+5、字符串替换操作
+
+${变量名称/old/new}
+
+[root@localhost ~]# foo="mp3.txt.txt.mp3.avi"
+[root@localhost ~]# 
+[root@localhost ~]# echo ${foo/txt/TXT}
+mp3.TXT.txt.mp3.avi
+[root@localhost ~]# 
+[root@localhost ~]# echo ${foo//txt/TXT}
+mp3.TXT.TXT.mp3.avi
+
+
+[root@localhost ~]# foo="txt.mp3.txt"
+[root@localhost ~]# 
+[root@localhost ~]# echo ${foo/#txt/TXT}
+TXT.mp3.txt
+[root@localhost ~]# echo ${foo/%txt/TXT}
+txt.mp3.TXT
+
+
+6、实现大小写字母的转换
+
+# foo="ABde"
+# echo ${foo,,}      //将字符串foo全部转换成小写        
+abde
+# echo ${foo,}       //将字符串foo的第1个字符转换成小写
+aBde
+# echo ${foo^}      //将字符串foo的第1个字符转换成大写 
+ABde
+# echo ${foo^^}     //将字符串foo全部转换为大写         
+ABDE
+	
+	
+	
+	
+	
+	
+	
+	
+	
+数组 Array 
+	
+	一段连续的内存空间 
+	
+1) 定义数组 
+
+[root@shellscript shell]# aa[0]=martin
+[root@shellscript shell]# aa[1]=jerry
+[root@shellscript shell]# aa[2]=mike
+[root@shellscript shell]# aa[10]=alice
+
+	
+[root@shellscript shell]# bb=(192.168.1.1 192.168.1.2 192.168.1.3 192.168.1.4)
+	
+	
+2) 调用数组的值  
+
+[root@shellscript shell]# echo ${bb[2]}
+192.168.1.3
+
+[root@shellscript shell]# echo ${bb[1]}
+192.168.1.2
+
+[root@shellscript shell]# echo ${bb[*]}
+192.168.1.1 192.168.1.2 192.168.1.3 192.168.1.4
+
+[root@shellscript shell]# echo ${bb[@]}
+192.168.1.1 192.168.1.2 192.168.1.3 192.168.1.4
+	
+	
+3) 获取数组的长度 
+
+[root@shellscript shell]# echo ${#bb[*]}
+4
+[root@shellscript shell]# echo ${#bb[@]}
+4
+	
+	
+编写脚本，找出数组中的最大数 
+
+#!/bin/bash
+#
+
+aa=(14 543 64 235 76 345 765)
+
+max=${aa[0]}
+
+for i in `seq 6`; do
+   if [ $max -lt ${aa[$i]} ]; then
+     max=${aa[$i]}
+   fi
+done
+
+echo $max
+
+
+
+
+
+
+
+
+
+
+
+
+
+处理交互式的命令  -------   expect 
+
+1) 安装expect 
+
+# yum install -y expect 
+
+
+示例1：捕获ssh远程连接命令的提示 
+
+#!/usr/bin/expect
+#set timeout 20 设置超时时间
+
+
+spawn ssh root@192.168.122.121
+
+expect {
+	"yes/no" { send "yes\r"; exp_continue }
+	"password:" { send "uplooking\r" };
+}
+
+interact
+
+
+
+示例2：捕获scp命令的提示 
+
+#!/usr/bin/expect
+#set timeout 20  设置超时时间
+
+
+set ip 192.168.122.121
+
+spawn scp /etc/fstab $ip:/tmp
+
+expect {
+        "yes/no" { send "yes\r"; exp_continue }
+        "password:" { send "uplooking\r" };
+}
+
+expect eof
+
