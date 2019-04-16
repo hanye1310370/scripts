@@ -321,10 +321,10 @@ apt-get install libnotify-bin
 
 
 
-mysqldump -uzz-fx-com -p -hrds-1fangxin.mysql.rds.aliyuncs.com zz-fx-com --single-transaction --max_allowed_packet=2G |gzip > /mnt/oliver/zz-fx-com_20171211.sql.gz
+mysqldump -u -p -h --single-transaction --max_allowed_packet=2G |gzip > /mnt/oliver/zz-fx-com_20171211.sql.gz
 17:32
 
-/usr/local/mysql/bin/mysqldump -ufangxin_erp_hb -p'Fang2_xin0_erp_huabei10' -hrm-2zerjfvo378amm655.mysql.rds.aliyuncs.com bj_lianz --set-gtid-purged=OFF |gzip > /data/backup/mysql/lianzhong-`date +%Y%m%d%H%M%S`.gz
+/usr/local/mysql/bin/mysqldump -u -p -h --set-gtid-purged=OFF |gzip > /data/backup/mysql/lianzhong-`date +%Y%m%d%H%M%S`.gz
 
 
 bargain	other_commission_reasons	其它分佣原因	[]	multiple	[]
@@ -495,7 +495,7 @@ update erp_salary_summaries set year = year + 1  where month = 3
 
 
 删除mysql慢语句的会话：
-for i in mysql -uzz-fx-com -p1vCEclfJeuoqlkKN -hrds-1fangxin.mysql.rds.aliyuncs.com zm-fx-com -e "show processlist;"|grep "Sending data"|awk '{print $1}'; do mysql -uzz-fx-com -p1vCEclfJeuoqlkKN -hrds-1fangxin.mysql.rds.aliyuncs.com zm-fx-com  -e "kill $i"; done
+for i in mysql -u -h -e "show processlist;"|grep "Sending data"|awk '{print $1}'; do mysql -u -p -h -e "kill $i"; done
 
 show variables like '%log%';
 PURGE MASTER LOGS BEFORE DATE_SUB( NOW( ), INTERVAL 3 DAY);
@@ -559,7 +559,7 @@ creeper:area zhengzhou                                     抓取指定城市下
 
 
 大家保存一下数据抓取的命令。需要的时候配合实施部门进行数据导入。有问题随时和我沟通。
-千氏账号：18818881888  密码：110120
+
 
 同步agents：
 miyun.1fangxin.net/dc/sync/agent   
@@ -572,11 +572,7 @@ select * from erp_agents where id = 1143 or id = 532;
 
 
 
-运了一个维:
-我房环境跑脚本
-php artisan queue:work
- php artisan client:sync-wf-client
-运了一个维:
+
 所有环境
 通话记录: php artisan role:inlay-permission m.statistics-call-view
 成交分析: php artisan role:inlay-permission m.statistics-bargain-view
