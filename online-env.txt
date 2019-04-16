@@ -1,33 +1,33 @@
 root@iZ2ze5m012qi4yng2935q4Z:/home/erp/zhengzhou/A1# cat .env
 APP_ENV=production
 APP_DEBUG=false
-APP_KEY=base64:P4NtH6HBWFNoC3WZYxXBw2Feh8FC2JNhdOUjlINVHmc=
+APP_KEY=
 APP_LOCAL=zz
 
-ADMIN_URL = zz-admin.1fangxin.net
-WAP_URL = zz-wap.1fangxin.net
-MEMBER_URL = zz.1fangxin.net
-API_URL = zz-api.1fangxin.net
-WEB_URL = zz-website.1fangxin.net
-DC_URL = dc.1fangxin.net
+ADMIN_URL = 
+WAP_URL = 
+MEMBER_URL = 
+API_URL = 
+WEB_URL = 
+DC_URL = 
 
 SESSION_LIFE=3600
 
 DB_CONNECTION=mysql
-DB_HOST=rds-1fangxin.mysql.rds.aliyuncs.com
+DB_HOST=
 DB_PORT=3306
-DB_DATABASE=zz-fx-com
-DB_USERNAME=zz-fx-com
-DB_PASSWORD=1vCEclfJeuoqlkKN
-DB_PREFIX=erp_
+DB_DATABASE=
+DB_USERNAME=
+DB_PASSWORD=
+DB_PREFIX=
 
 
 
-DB_WWW_HOST=47.93.79.142
+DB_WWW_HOST=
 DB_WWW_PORT=3306
-DB_WWW_DATABASE=www
-DB_WWW_USERNAME=www
-DB_WWW_PASSWORD=www@erp_fangxin_8866
+DB_WWW_DATABASE=
+DB_WWW_USERNAME=
+DB_WWW_PASSWORD=
 DB_WWW_PREFIX=fx_
 
 
@@ -35,9 +35,9 @@ CACHE_DRIVER=redis
 SESSION_DRIVER=redis
 QUEUE_DRIVER=redis
 
-REDIS_HOST=r-m5e2a53959c401e4.redis.rds.aliyuncs.com
-REDIS_PASSWORD=Fangxin0633
-REDIS_PORT=6379
+REDIS_HOST=
+REDIS_PASSWORD=
+REDIS_PORT=
 REDIS_NO_0=15
 REDIS_NO_1=16
 REDIS_NO_2=17
@@ -50,4 +50,4 @@ MAIL_PASSWORD=null
 MAIL_ENCRYPTION=null
 
 AUDITING_QUEUE=false
-BUGSNAG_API_KEY=bdd32049287cbba32c1989fb2d4154c1
+BUGSNAG_API_KEY=
