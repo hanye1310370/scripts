@@ -9,6 +9,6 @@
 #crontab: * * * * * jenkins_wofang.sh
 #Website:   www.1fangxin.net
 #License: GPL
-#curl -s -u "wofang_online:wofang_online12300." -X GET   http://jenkins.wofang.com/job/%E6%88%91%E6%88%BF%E6%AD%A3%E5%BC%8F%E7%8E%AF%E5%A2%83/build?token=wofang123456online
+#curl -s -u "user:passwd" -X GET   http://j.com/job/%E6%88%91%E6%88%BF%E6%AD%A3%E5%BC%8F%E7%8E%AF%E5%A2%83/build?token=wofang123456online
 ./jindutiao.sh
-curl -s -u "wofang_online:wofang_online12300." -X GET   http://jenkins.wofang.com/job/%E6%88%91%E6%88%BF%E6%AD%A3%E5%BC%8F%E7%8E%AF%E5%A2%83/lastBuild/consoleText
+curl -s -u "user:passwd"  -X GET   http://j.com/job/%E6%88%91%E6%88%BF%E6%AD%A3%E5%BC%8F%E7%8E%AF%E5%A2%83/lastBuild/consoleText
