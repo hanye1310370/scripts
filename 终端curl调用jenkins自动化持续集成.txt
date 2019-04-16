@@ -20,11 +20,11 @@ curl --user fx_test:123456   -H "Jenkins-Crumb:5d89b728ca24f7fa380dfd6074baa0bf"
 root@debian45:~#  curl -u devops:98a99e1cb62f8099605e2ac138809f7d -H"Jenkins-Crumb:2dc85050f762edacf8d397fb1b41f6a1" -X POST http://jenkins.1fangxin.cn/job/%E6%88%BF%E4%BF%A1%E4%BA%91%E5%B9%B3%E5%8F%B0-%E6%B1%9F%E8%A5%BF%E7%94%9F%E4%BA%A7%E7%8E%AF%E5%A2%83/buildWithParameters
  curl -u devops:98a99e1cb62f8099605e2ac138809f7d -H"Jenkins-Crumb:2dc85050f762edacf8d397fb1b41f6a1" -X POST http://192.168.1.45:8090/job/aa/buildWithParameters
 8.设置参数方法1
-curl -u test:98a99e1cb62f8099605e2ac138809f7d -H"Jenkins-Crumb:2dc85050f762edacf8d397fb1b41f6a1" -X POST http://jenkins.abc.cn/job/%E6%88%BF%E4%BF%A1%E4%BA%91%E5%B9%B3%E5%8F%B0-%E6%B1%9F%E8%A5%BF%E7%94%9F%E4%BA%A7%E7%8E%AF%E5%A2%83/buildWithParameters -d jiangxi=all
+curl -u test:98a99e1cb62f8099605e2ac138809f7d -H"Jenkins-Crumb:2dc85050f76" -X POST http://jenkins.abc.cn/job/%E6%88%BF%E4%BF%A1%E4%BA%91%E5%B9%B3%E5%8F%B0-%E6%B1%9F%E8%A5%BF%E7%94%9F%E4%BA%A7%E7%8E%AF%E5%A2%83/buildWithParameters -d jiangxi=all
 9.删除job
-curl --user fx_test:123456   -H "Jenkins-Crumb:5d89b728ca24f7fa380dfd6074baa0bf" -X POST  http://192.168.1.45:8090/job/aa/doDelete
+curl --user fx_test:123456   -H "Jenkins-Crumb:5d89b72" -X POST  http://192.168.1.45:8090/job/aa/doDelete
 10.获取项目描述：
-root@debian45:~# curl --user fx_test:123456   -H "Jenkins-Crumb:5d89b728ca24f7fa380dfd6074baa0bf" -X GET   http://192.168.1.45:8090/job/erp_test2/description
+root@debian45:~# curl --user fx_test:123456   -H "Jenkins-Crumb:5d89b728ca24f7f" -X GET   http://192.168.1.45:8090/job/erp_test2/description
 erp_test2 
 11.获取配置文件：
 root@debian45:~# curl --user fx_test:123456   -X GET   http://192.168.1.45:8090/job/erp_test2/config.xml
