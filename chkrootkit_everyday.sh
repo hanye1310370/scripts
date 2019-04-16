@@ -21,10 +21,10 @@ TIME="`date +%Y%m%d%H%M`"
 if [ "`grep 'INFECTED' /data/sh/.chkrootkitLog/.chkrootkit_$TIME.log`" != "" ];then
 echo "Dangerous"
 EMAIL='/usr/local/sendEmail/sendEmail'
-FEMAIL="hanjinshuai@1fangxin.cn" #发件邮箱
+FEMAIL="" #发件邮箱
 MAILP="Hanye131"
 MAILSMTP="smtp.exmail.qq.com" #发件邮箱的SMTP
-MAILT="hz7726@163.com,1046679050@qq.com,937849667@qq.com,523924260@qq.com" #收件邮箱
+MAILT=",,," #收件邮箱
 MAILmessage="147server command change ERROR"
 $EMAIL -q -f $FEMAIL -t $MAILT -u "您服务器有人登录修改命令,请使用chkrootkit来检测" -m "$MAILmessage" -s $MAILSMTP -o message-charset=utf-8 -xu $FEMAIL -xp $MAILP -o tls=no
 else
