@@ -114,11 +114,11 @@ case ${Node} in
                   host2=10.163.149.58
                   redis_host=10.81.33.234
                   redis_passwd=redis12300.
-                  mysql_gran_user=fangxin_erp_hb2
-                  mysql_gran_pw='Fang_xin_erps_hb@$232'
-                  mysql_user=fangxin_erp_hb2
-                  mysql_passwd='Fang_xin_erps_hb@$232'
-                  mysql_url=rm-2zeh69u2118d9ru72.mysql.rds.aliyuncs.com
+                  mysql_gran_user=
+                  mysql_gran_pw=''
+                  mysql_user=
+                  mysql_passwd=''
+                  mysql_url=
                   DB=$(ssh ${host} "find /home/erp/ -name ".env"|xargs grep NO_"|awk -F = '{print $NF}'|sort -n|tail -1)
                   DB1=$(($DB+1))
                   DB2=$(($DB+2))
