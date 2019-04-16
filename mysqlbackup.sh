@@ -1,9 +1,9 @@
 root@iZ2zeb1kcfbotalsu02k64Z:~# cat   /data/sh/mysqlbackup.sh 
 #!/bin/bash
-db_user="fangxin_erp_hb"
-db_passwd="Fang2_xin0_erp_huabei10"
-host="rm-2zerjfvo378amm655.mysql.rds.aliyuncs.com"
-DB_NAME="haerbin haerbin_demo beijing tianjin_test"
+db_user=""
+db_passwd=""
+host=""
+DB_NAME=""
 #备份目录
 backup_dir="/mnt/backup/bakmysql"
 #时间格式
